@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/analysis/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/analysis/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Reddit hates George Bush more than Vladimir Putin</title>
+      <link>/kstirman.github.io/bookshelf/blog/reddit-hates-george-bush-more-than-vladimir-putin/</link>
+      <pubDate>Fri, 29 Jan 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/reddit-hates-george-bush-more-than-vladimir-putin/</guid>
+      <description>&lt;p&gt;Just as I promised, today I&amp;rsquo;m going to show off that nifty sentiment analysis UDF for Apache Drill that I discussed in
+&lt;a href=&#34;http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/&#34;&gt;the last article&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Today&amp;rsquo;s data is &lt;a href=&#34;http://www.dremio.com/blog/old-and-busted-teasing-formerly-fashionable-websites-from-reddit-data/&#34;&gt;once
+again&lt;/a&gt; provided by
+this &lt;a href=&#34;https://www.reddit.com/r/datasets/comments/3mg812/full_reddit_submission_corpus_now_available_2006/&#34;&gt;awesome dump of Reddit
+submissions&lt;/a&gt; that
+date from 2006 up through last summer. Basically I just ran the sentiment analyzer function through submission titles,
+examining a selection of politicians that I thought Reddit might feel strongly about.&lt;/p&gt;
+
+&lt;p&gt;In terms of nitty-gritty Drill stuff, I started by first making a view for the data that includes the sentiment score as
+computed by the star of yesterday&amp;rsquo;s post, the &lt;code&gt;SIMPLESENT()&lt;/code&gt; function:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; USE dfs.tmp;
+&amp;gt; CREATE VIEW testview AS SELECT LOWER(title) title, TO_TIMESTAMP(CAST(created_utc AS INT)) created, score, SIMPLESENT(title) sentiment FROM hdfs.`/data/RS_full_corpus.json`;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And from there I just computed a simple average of those scores over the entire corpus:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT AVG(sentiment) FROM testview WHERE title LIKE &#39;%donald trump%&#39;;
++------------------------+
+|         EXPR$0         |
++------------------------+
+| -0.052544239386344636  |
++------------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Remember negative scores indicate negative feelings, and likewise for positive scores. The somewhat surprising results
+are compiled below in Figure 1.&lt;/p&gt;
+
+&lt;p&gt;&lt;p style=&#34;text-align: center;&#34;&gt;
+&lt;img style=&#34;max-width: 100%;&#34; src=&#34;kstirman.github.io/bookshelf/img/reddit_politicians.png&#34;&gt;
+&lt;/p&gt;
+&lt;p style=&#34;text-align: center; font-style: italic;&#34;&gt;&lt;b&gt;Figure 1&lt;/b&gt;: Sentiment analysis for various politicians based on
+Reddit submission title.&lt;/p&gt;
+&lt;br&gt;
+&lt;br&gt;
+&lt;br&gt;
+&lt;br&gt;&lt;/p&gt;
+
+&lt;p&gt;So, yes, according to this sentiment analysis, Reddit definitely dislikes George Bush more than Vladimir Putin. I always
+think of Reddit as overall leaning a bit left in terms of politics, so it didn&amp;rsquo;t shock me to see Barack Obama and Bernie
+Sanders show up with positive values. However, it &lt;em&gt;did&lt;/em&gt; surprise me to see Hillary Clinton score negatively. And not
+only that, she scored even &lt;em&gt;more&lt;/em&gt; negatively than Sarah Palin!&lt;/p&gt;
+
+&lt;p&gt;Finally, those of us who were frequent redditors during the 2008 election season will be far from confused by the
+average sentiment score achieved by then nominal-Republican Ron Paul.&lt;/p&gt;
+
+&lt;p&gt;Reddit loves that guy.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Installing Apache Drill on Microsoft Windows</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Installing Apache Drill on Microsoft Windows</h1>
+          <h4>by Nathan Griffith on 2015-12-08</h4>
+          <p>Many of my previous articles on the Dremio Blog have assumed that you&rsquo;d be using Apache Drill from within some flavor of
+unix (namely either Linux or OS X), but it&rsquo;s completely possible to install Drill on Microsoft Windows as well. In this
+post I&rsquo;ll cover how to install and run a single-machine instance of Drill on Windows Server 2012 R2.</p>
+
+<p>Just like the unix versions, you&rsquo;ll need to have the Java Development Kit installed to run Drill. You can grab JDK
+version 7 from <a href="http://www.oracle.com/technetwork/java/javase/downloads/jdk7-downloads-1880260.html">this site</a>. You&rsquo;ll
+also need some way to uncompress the <code>.tar.gz</code> file extension that Drill comes packaged in. The open source Windows
+utility <a href="http://www.7-zip.org/">7-Zip</a> is a popular choice for this task. (Note: You will need to &lsquo;unzip&rsquo; the Drill file
+twice&mdash;once to kill the &lsquo;.gz&rsquo; extension and another time to get rid of the &lsquo;.tar&rsquo;).</p>
+
+<p>Before we run Drill we need to set up some environment variables in Windows. In Windows Server 2012, you can edit these
+by opening the Control Panel, hitting &lsquo;System and Security&rsquo;, &lsquo;System,&rsquo; and then &lsquo;Advanced system settings&rsquo; on the
+left. Finally, head to the &lsquo;Advanced&rsquo; tab in this new window and click the &lsquo;Environment Variables&hellip;&rsquo; button.</p>
+
+<p><br>
+<br>
+<p style="text-align: center;">
+<img style="max-width: 100%;" src="/img/windows_env.png">
+</p>
+<p style="text-align: center; font-style: italic;">Configuring environment variables in Windows Server 2012.</p>
+<br>
+<br></p>
+
+<p>Now we need to create a new user variable, so hit &lsquo;New&hellip;&rsquo; under the first list and put in a variable name of
+<code>JAVA_HOME</code> with a value that indicates the directory of your Java install (in my case: &lsquo;C:\Program
+Files\Java\jdk1.7.0_79&rsquo;). Next we&rsquo;ll edit the value of the <code>Path</code> variable in the &lsquo;System variables&rsquo; list by adding a
+semi-colon followed by &lsquo;C:\Program Files\Java\jdk1.7.0_79\bin&rsquo;.</p>
+
+<p>Almost there! Open a Command Prompt window and cd to the &lsquo;bin&rsquo; directory where you unpacked Drill. Now type the
+following command:</p>
+
+<pre><code>sqlline.bat -u &quot;jdbc:drill:zk=local&quot;
+</code></pre>
+
+<p>and you should be presented with a standard single-machine Drill session.</p>
+
+<p>Drill is just as easy to use on Windows as it is on unix, and you can look forward to more Windows-focused content on
+the Dremio Blog real soon!</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

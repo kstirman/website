@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> What can LIGO see? Let&#39;s look at gravitational waves with SQL</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>What can LIGO see? Let&#39;s look at gravitational waves with SQL</h1>
+          <h4>by Nathan Griffith on 2016-02-11</h4>
+          <script type="text/javascript"
+ src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+<p>It&rsquo;s difficult to overstate how thrilling today&rsquo;s news about gravity waves is. The scientific community has been waiting
+a <em>long</em> time for this, and verification of the phenomenon has wide reaching implications in the fields of both
+astrophysics and particle physics. Gravity is, after all, the biggest thorn in the side of modern theoretical particle
+physics.</p>
+
+<p>From a particle-centric standpoint gravity wave detection is identical to &lsquo;graviton&rsquo; detection. This is important
+because gravitons amount to the &lsquo;missing link&rsquo; between the currently disconnected realms of the very big (dictated by
+Einstein&rsquo;s general relativity) and the very small (governed by quantum mechanics). The observation of gravitational
+waves may help to constrain the current multitude of competing quantum gravity theories, leading us closer what&rsquo;s
+frequently called the Holy Grail of physics: a Theory of Everything.</p>
+
+<p>Because the LIGO gravitational wave observatory is awesome, they&rsquo;ve made some of the data relevant to their gravity wave
+event public (go check out <a href="https://losc.ligo.org/events/GW150914/">this site</a>). As you may have guessed, I&rsquo;m going to
+use <a href="https://drill.apache.org/docs/drill-in-10-minutes/">Apache Drill</a> to say something about the data! In particular
+I&rsquo;ll be investigating just how sensitive their equipment is, and what else they may be able to detect.</p>
+
+<p>To do this analysis, I&rsquo;ll be looking at the data for the &lsquo;H1&rsquo; LIGO detector shown in the leftmost plots of the top and
+third rows of <a href="https://losc.ligo.org/events/GW150914/">Figure 1</a>. These files are called <code>fig1-observed-H.txt</code> and
+<code>fig1-residual-H.txt</code>, and they contain the signal-with-background and background-only time series data. To use these
+with Drill, open them up and remove the first line of the file, which is a comment. Then go edit the &lsquo;dfs&rsquo; plugin JSON
+(go to <a href="http://localhost:8047/storage/dfs">http://localhost:8047/storage/dfs</a> after starting <code>drill-embdedded</code>) so that you have an entry in <code>&quot;formats&quot;</code> that
+looks like:</p>
+
+<pre><code>    &quot;txt&quot;: {
+      &quot;type&quot;: &quot;text&quot;,
+      &quot;extensions&quot;: [
+        &quot;txt&quot;
+      ],
+      &quot;delimiter&quot;: &quot; &quot;
+    },
+</code></pre>
+
+<p>This ensures that Drill knows that to do with a file that ends in &lsquo;.txt&rsquo;, instructing it to treat spaces as the column
+delimiter. With this done, let&rsquo;s write a SQL query to find the standard deviation of the background noise:</p>
+
+<pre><code>&gt; SELECT STDDEV(CAST(columns[1] AS FLOAT)) FROM dfs.`/path/to/fig1-residual-H.txt`;
++----------------------+
+|        EXPR$0        |
++----------------------+
+| 0.16534411608717056  |
++----------------------+
+</code></pre>
+
+<p>So now let&rsquo;s ask: On average, how many standard deviations away from the noise are the 100 biggest signal data points?
+First, we&rsquo;ll make a view (remember <code>USE dfs.tmp;</code>):</p>
+
+<pre><code>CREATE VIEW bigsignal AS
+     SELECT ABS(CAST(columns[1] AS FLOAT)/0.165) signal
+       FROM dfs.`/Users/ngriffith/Downloads/LIGO/fig1-observed-H.txt`
+   ORDER BY signal DESC
+      LIMIT 100;
+</code></pre>
+
+<p>and then we can take the average:</p>
+
+<pre><code>&gt; SELECT AVG(signal) FROM bigsignal;
++--------------------+
+|       EXPR$0       |
++--------------------+
+| 5.884780800703798  |
++--------------------+
+</code></pre>
+
+<p>Not too far off from the event significance given in <a href="https://dcc.ligo.org/P150914/public">the paper</a> of 5.3 sigma!
+(Although their methodology is admittedly wildly different as well as much more rigorous and subtle.)</p>
+
+<p>But what exactly <em>is</em> this signal? Well a LIGO detector works by precisely measuring two identical kilometer-scale
+distances with lasers. The measured distances are are arranged in a cross-pattern, so that any passing gravitational
+waves will cause these lengths to contract or expand relative to one another by different (<em>very tiny!</em>) amounts. The
+&lsquo;signal&rsquo; numbers that we&rsquo;ve been looking at are the differences between these two lengths. One source of gravity waves
+(and the one that the people who run LIGO indicate in their announcement) is two massive bodies, such as black holes,
+orbiting one another.</p>
+
+<p>Now let&rsquo;s have a little more fun. The length difference from the data should be directly proportional to the amplitude
+\( A \) of the gravity wave, which in this situation expresses the proportionality (<a href="https://en.wikipedia.org/wiki/Gravitational_wave#Power_radiated_by_orbiting_bodies">according to
+Wikipedia</a>) of:</p>
+
+<p>$$ A \propto  \frac{m_1 m_2}{R} $$</p>
+
+<p>where \( m_1 \) and \( m_2 \) are the masses of the orbiting bodies, and \( R \) is the distance of the observer
+from the center of mass of the two-body system.</p>
+
+<p>Decreasing the observed signal waveform of about 5.88 sigma by half would leave itself us comfortably near 3 sigma
+territory, which is still a very strong indicator for significance (randomly achieving 3 sigma result is about a
+one-in-ten-thousand event). Admittedly from a visual standpoint this wouldn&rsquo;t leave a very strong looking signal, but
+statistical analysis in conjunction with confirmation from another type of observatory (such as one looking at radio or
+gamma rays) may yield useful astrophysical data.</p>
+
+<p>In the discovery paper the authors list two colliding black holes with similar masses (around 30 times the Sun) as a
+likely source of the event that they observed. They also place the event at a distance of about 1.2 billion light-years
+from Earth. If we can manage to notice gravity wave signals with half the strength, then LIGO would be able to detect
+similar events twice as far away, or with 71% the constituent mass.</p>
+
+<p>The gravitational wave astronomy revolution has just started, and I&rsquo;m extremely excited to see where it leads us!</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> White mana cards are cheap and stupid: Querying a database of every Magic card ever made</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>White mana cards are cheap and stupid: Querying a database of every Magic card ever made</h1>
+          <h4>by Nathan Griffith on 2015-12-03</h4>
+          <p>With over 10,000 unique cards and a decade of success behind it, <em>Magic: The Gathering</em> is still as relevant as ever to
+fans of the collectible card game genre. But how well has <em>Magic</em> managed to stick to its core design philosophy over
+the years? Today we&rsquo;ll examine this question by analyzing a JSON dump of the text found on every card ever produced.</p>
+
+<p>For the uninitiated (and those who haven&rsquo;t a touched a card since their days on the middle school cafeteria circuit),
+actions in a <em>Magic</em> game are enabled by a resource called &ldquo;mana&rdquo; that comes in five fundamental varieties: White, Blue,
+Black, Red, and Green. Each of these colors has a different personality and play style. I&rsquo;m not going to go into extreme
+detail here (believe me, you can find that somewhere else on the web if you need it), but some of the characteristics
+are:</p>
+
+<ul>
+<li>White: Likes to fight using small creatures. Has a focus on life and healing.</li>
+<li>Blue: Values control and intellectual capacity.</li>
+<li>Black: Uses cards with themes of death and disease. Not afraid of hurting the player to the gain the advantage.</li>
+<li>Red: Emphasis on creatures that pack a lot of offensive punch and spells that do damage.</li>
+<li>Green: Employs large powerful creatures and nature/life forces.</li>
+</ul>
+
+<p><br>
+<br>
+<p style="text-align: center;">
+<img style="max-width: 100%;" src="/img/mtg_mana.jpg">
+</p>
+<p style="text-align: center; font-style: italic;">The mana symbols of <em>Magic: The Gathering</em>.<br>Source: <a href="http://archive.wizards.com/Magic/magazine/article.aspx?x=mtg/daily/arcana/719">http://archive.wizards.com/Magic/magazine/article.aspx?x=mtg/daily/arcana/719</a></p>
+<br>
+<br></p>
+
+<p>We&rsquo;ll proceed by using Apache Drill to query a folder full of JSON documents (one for each <em>Magic</em> set), which is
+available via <a href="http://mtgjson.com">this site</a> as a zipped file. As an example, here&rsquo;s the JSON for a card called
+&ldquo;Abyssal Hunter&rdquo; which is found in the &ldquo;cards&rdquo; list of the object/file corresponding to the &ldquo;Mirage&rdquo; set:</p>
+
+<pre><code>{
+  &quot;artist&quot;:&quot;Steve Luke&quot;,
+  &quot;cmc&quot;:4,
+  &quot;colors&quot;:[&quot;Black&quot;],
+  &quot;flavor&quot;:&quot;Some smiles show cheer; some merely show teeth.&quot;,
+  &quot;id&quot;:&quot;61beaf3de61dc097e0070b3f13b8de84da3c2761&quot;,
+  &quot;imageName&quot;:&quot;abyssal hunter&quot;,
+  &quot;layout&quot;:&quot;normal&quot;,
+  &quot;manaCost&quot;:&quot;{3}{B}&quot;,
+  &quot;multiverseid&quot;:3272,&quot;name&quot;:&quot;Abyssal Hunter&quot;,
+  &quot;power&quot;:&quot;1&quot;,
+  &quot;rarity&quot;:&quot;Rare&quot;,
+  &quot;subtypes&quot;:[&quot;Human&quot;,&quot;Assassin&quot;],
+  &quot;text&quot;:&quot;{B}, {T}: Tap target creature. Abyssal Hunter deals damage equal to Abyssal Hunter's power to that creature.&quot;,
+  &quot;toughness&quot;:&quot;1&quot;,
+  &quot;type&quot;:&quot;Creature — Human Assassin&quot;,
+  &quot;types&quot;:[&quot;Creature&quot;]
+}
+</code></pre>
+
+<p>Before we begin our analysis, let&rsquo;s do a little prep work and set up a &ldquo;view&rdquo; in Drill called <code>card_data</code> that we can
+query against. The following command makes a view that pulls data about the name, mana cost, text, mana color, and the
+toughness/power of a card if it&rsquo;s a &lsquo;creature&rsquo;:</p>
+
+<pre><code class="language-sql">CREATE VIEW card_data AS select DISTINCT t.cards.name Name, t.cards.cmc CMC, t.cards.text Text, t.cards.colors[0] Color,
+            t.cards.types[0] Type, t.cards.toughness Toughness, t.cards.`power` `Power`
+       FROM (SELECT FLATTEN(t_raw.cards) cards
+               FROM dfs.`/path/to/AllSetFiles` t_raw) t
+       WHERE t.cards.colors[0] IS NOT NULL
+         AND t.cards.colors[1] IS NULL
+         AND t.cards.types[0] IS NOT NULL
+         AND t.cards.types[1] IS NULL;
+</code></pre>
+
+<p>To simplify things, I&rsquo;m using the last four lines to specify cards that have only one color requirement for mana (e.g.
+&lsquo;Black&rsquo;), and are classified as belonging to only one type (e.g. &lsquo;Creature&rsquo;).</p>
+
+<p>First, let&rsquo;s see if Black&rsquo;s supposed fascination with morbidity holds up by searching the card texts for instances of
+the word &lsquo;die.&rsquo;</p>
+
+<pre><code>&gt; SELECT Color, COUNT(Name) `Num Cards` FROM card_data WHERE LOWER(Text) LIKE '%die%' GROUP BY Color;
++--------+------------+
+| Color  | Num Cards  |
++--------+------------+
+| White  | 45         |
+| Black  | 74         |
+| Red    | 48         |
+| Green  | 49         |
+| Blue   | 13         |
++--------+------------+
+</code></pre>
+
+<p>Ok, so far so good. Now what about the word &lsquo;life&rsquo;? Seems like this one should show up a lot in White and maybe Green
+cards.</p>
+
+<pre><code>&gt; SELECT Color, COUNT(Name) `Num Cards` FROM card_data WHERE LOWER(Text) LIKE '%life%' GROUP BY Color;
++--------+------------+
+| Color  | Num Cards  |
++--------+------------+
+| White  | 189        |
+| Black  | 243        |
+| Green  | 80         |
+| Blue   | 9          |
+| Red    | 20         |
++--------+------------+
+</code></pre>
+
+<p>Wow&mdash;Black is once again in the lead! I think that makes sense though; a lot of Black cards probably
+have to do with manipulating the player&rsquo;s life points. But it&rsquo;s still a bit odd that Black comes off as the most
+explicitly &lsquo;life&rsquo;-obsessed.</p>
+
+<p>Next let&rsquo;s see if the creature cards from each color of mana fall in line with their characterizations from the list
+above. We can ask for the average &lsquo;power&rsquo; and &lsquo;toughness&rsquo; of creatures with non-contextual stats (i.e., ones that don&rsquo;t
+have an asterisk in these values) with this query:</p>
+
+<pre><code>&gt; SELECT Color, AVG(CAST(`Power` AS FLOAT)) `Avg Power`, AVG(CAST(Toughness AS FLOAT)) `Avg Toughness` FROM card_data t WHERE Type = 'Creature' AND `Power` NOT LIKE '%*%' AND `Toughness` NOT LIKE '%*%' GROUP BY Color;
++--------+---------------------+---------------------+
+| Color  |      Avg Power      |    Avg Toughness    |
++--------+---------------------+---------------------+
+| White  | 2.026235741444867   | 2.555513307984791   |
+| Blue   | 2.2026678141135974  | 2.6351118760757317  |
+| Black  | 2.5331278890600926  | 2.450308166409861   |
+| Red    | 2.6187548039969255  | 2.4584934665641813  |
+| Green  | 2.6882978723404256  | 2.8177304964539007  |
++--------+---------------------+---------------------+
+</code></pre>
+
+<p>Yup, Green definitely has the most &lsquo;power&rsquo;-ful offensive creatures on average, with Red falling just behind it. But
+what&rsquo;s interesting about the results of this query is how close the average Black creature falls to the average Red
+creature&mdash;especially when you take into account their defensive &lsquo;toughness&rsquo; stat. Black&rsquo;s creature characterization
+isn&rsquo;t emphasized in descriptions of the mana colors, but this table indicates that Black creatures are &ldquo;basically Red&rdquo;
+(at least when it comes to their fundamental stats).</p>
+
+<p>Finally, let&rsquo;s check out the average converted mana cost and average text length of mono-colored, mono-typed cards.
+Converted mana cost (CMC) is the total amount of mana resources (color-specific plus any-colored) that a card requires
+when it&rsquo;s put in play, and the text of a card tells you how to use it in a game.</p>
+
+<pre><code>&gt; SELECT Color, AVG(CMC) `Avg CMC`, AVG(LENGTH(Text)) `Avg Text Length` FROM card_data t GROUP BY Color;
++--------+---------------------+---------------------+
+| Color  |       Avg CMC       |   Avg Text Length   |
++--------+---------------------+---------------------+
+| White  | 3.154371002132196   | 132.53899480069325  |
+| Blue   | 3.3505647263249347  | 143.49057430951336  |
+| Black  | 3.4389721627408996  | 141.2681660899654   |
+| Red    | 3.3674957118353346  | 138.5313862249346   |
+| Green  | 3.3970149253731345  | 139.6011309264898   |
++--------+---------------------+---------------------+
+</code></pre>
+
+<p>Remember how I said White liked to play small creatures? Well it looks like all those small-cost cards are pretty
+evident in White&rsquo;s average mana cost. So: check. White is behaving as expected.</p>
+
+<p>It&rsquo;s worth noting, though, that Black clearly has the highest average mana cost of the five colors. I feel like that&rsquo;s
+pretty notable! Maybe that fact should be included in more intro summaries.</p>
+
+<p>We haven&rsquo;t talked about Blue much yet, but remember: It&rsquo;s the mana color that most likes to show off its knack for
+strategy and fancy book learnin&rsquo;. If we can take the average length of a card&rsquo;s instruction text to be a good indicator
+of complexity, then this table shows that Blue definitely lives up to its reputation.</p>
+
+<p>So if Blue is &lsquo;smart,&rsquo; then who is &lsquo;stupid&rsquo;? Well, I guess that would be White. However, I can see why no one describes
+it that way: &ldquo;Play White: It&rsquo;s cheap and stupid!&rdquo; probably isn&rsquo;t the best way create new fans of White <em>Magic</em> cards.</p>
+
+<p><em>Mana symbols and card text are copyright Wizards of the Coast LLC.</em></p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

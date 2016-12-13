@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/database/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/database/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Setting up an SQL interface to a sharded MongoDB</title>
+      <link>/kstirman.github.io/bookshelf/blog/setting-up-an-SQL-interface-to-a-sharded-MongoDB/</link>
+      <pubDate>Wed, 02 Dec 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/setting-up-an-SQL-interface-to-a-sharded-MongoDB/</guid>
+      <description>&lt;p&gt;Salutations, data fans! Today I&amp;rsquo;d like to demonstrate how to use Apache Drill to query a sharded MongoDB database
+running on a computer cluster.&lt;/p&gt;
+
+&lt;p&gt;To begin with, I&amp;rsquo;m going to assume you already know how to do a sharded Mongo setup (the &lt;a href=&#34;https://docs.mongodb.org/manual/sharding/&#34;&gt;official
+documentation&lt;/a&gt; is very helpful), or you already have access to a system with
+a sharded MongoDB in place. With this out of the way, I can focus on the Drill setup.&lt;/p&gt;
+
+&lt;p&gt;When running in a multiple machine environment, Drill can increase its efficiency for very large queries by coordinating
+between several instances of a service called a &amp;lsquo;drillbit.&amp;rsquo; To help track these instances we use a piece of software
+called &lt;a href=&#34;https://zookeeper.apache.org/&#34;&gt;Apache Zookeeper&lt;/a&gt;. Once Zookeeper is installed, you should make a &amp;lsquo;zoo.cfg&amp;rsquo; file
+in its &amp;lsquo;./conf&amp;rsquo; directory. This simple one works fine for our purposes (create a &amp;lsquo;dataDir&amp;rsquo; as needed):&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;tickTime=2000
+dataDir=/home/cluster-user/zookeeper/data
+clientPort=2183
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Next you should download and install Drill to each of the nodes in the cluster that you&amp;rsquo;d like a drillbit to run on. For
+my setup I&amp;rsquo;ve chosen to run a drillbit on each node that contains a MongoDB shard. This is a good idea because Drill
+considers the location of data stores when it performs queries. The ./conf/drill-override.conf file for each install
+should be edited to reflect the IP address and port of your Zookeeper. For instance, you could write:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;drill.exec: {
+  cluster-id: &amp;quot;drill-cluster-example&amp;quot;,
+  zk.connect: &amp;quot;172.31.0.0:2183&amp;quot;
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Where the name &amp;ldquo;drill-cluster-example&amp;rdquo; is the same for each node.&lt;/p&gt;
+
+&lt;p&gt;With this minor bit of configuration out of the way, all that&amp;rsquo;s left is to start the software. First bring up the
+Zookeeper server with &amp;lsquo;~/zookeeper/bin/zkServer.sh start&amp;rsquo;, and then launch the drillbits by running
+&amp;lsquo;~/apache-drill/bin/drillbit.sh start&amp;rsquo; on each node.
+After you&amp;rsquo;ve started everything, you can run &amp;lsquo;drill-conf&amp;rsquo; to bring you to an SQL prompt. If all is well, you
+should be able to run &lt;code&gt;SELECT * FROM sys.drillbits;&lt;/code&gt; and see each drillbit on the cluster report in. For example on a
+three machine test cluster I saw the following:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; select * from sys.drillbits;
++----------------------------------------------+------------+---------------+------------+----------+
+|                   hostname                   | user_port  | control_port  | data_port  | current  |
++----------------------------------------------+------------+---------------+------------+----------+
+| ip-172-31-41-122.us-west-2.compute.internal  | 31010      | 31011         | 31012      | false    |
+| ip-172-31-41-120.us-west-2.compute.internal  | 31010      | 31011         | 31012      | false    |
+| ip-172-31-41-121.us-west-2.compute.internal  | 31010      | 31011         | 31012      | true     |
++----------------------------------------------+------------+---------------+------------+----------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now all that&amp;rsquo;s left is to activate the Drill interface to MongoDB. Open the Drill Web Console by visiting one of the
+nodes that&amp;rsquo;s running a drillbit (use port 8047, just like before). From here click &amp;ldquo;Enable&amp;rdquo; next to the &amp;ldquo;mongo&amp;rdquo; plugin,
+and then hit &amp;ldquo;Update.&amp;rdquo; Now change &amp;ldquo;localhost:27017&amp;rdquo; in the &amp;ldquo;connection&amp;rdquo; field to correspond to the IP and port of the
+machine that runs your &amp;lsquo;mongos&amp;rsquo; process. If you have more than one &amp;ldquo;mongos&amp;rdquo; you can specify them all like this:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;...
+  &amp;quot;connection&amp;quot;: &amp;quot;mongodb://172.31.41.120:27017,172.31.41.121:27017,172.31.41.122:27017&amp;quot;,
+...
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And that&amp;rsquo;s it! You&amp;rsquo;re now all set to run SQL queries on your sharded MongoDB via Drill. For an example of how to
+interface with some complicated JSON-based data that&amp;rsquo;s typical of MongoDB collections, check out &lt;a href=&#34;http://www.dremio.com/blog/bless-this-mess-working-with-complicated-json-structure-in-sql/&#34;&gt;this
+other&lt;/a&gt; post.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

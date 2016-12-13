@@ -1,0 +1,1762 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/drill/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/drill/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Parsing EPA vehicle data for linear correlations in MPG ratings</title>
+      <link>/kstirman.github.io/bookshelf/blog/parsing-epa-vehicle-data-for-linear-correlations-in-mpg-ratings/</link>
+      <pubDate>Thu, 11 Feb 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/parsing-epa-vehicle-data-for-linear-correlations-in-mpg-ratings/</guid>
+      <description>&lt;p&gt;In &lt;a href=&#34;http://www.dremio.com/blog/calculating-pearsons-r-using-a-custom-sql-function/&#34;&gt;the previous day&amp;rsquo;s post&lt;/a&gt; I
+demonstrated how to code a custom aggregate function that can process two sets of data points into their corresponding
+Pearson&amp;rsquo;s &lt;em&gt;r&lt;/em&gt; value, which is a useful indicator of variable correlation. Today I&amp;rsquo;m going to put that function to the
+test on this &lt;a href=&#34;https://www.fueleconomy.gov/feg/download.shtml&#34;&gt;EPA data set&lt;/a&gt; that contains information about vehicles
+manufactured from model years 1984 to 2017. The two questions I&amp;rsquo;d like to answer are: 1.) Does the combined MPG rating
+for a car correlate with model year? and 2.) How does an engine&amp;rsquo;s displacement affect the combined MPG rating?&lt;/p&gt;
+
+&lt;p&gt;To begin with, I&amp;rsquo;m going to create two views that average over combined MPG for each of the other variables of interest.
+These are constructed as follows:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW year_mpg AS
+     SELECT CAST(`year` AS FLOAT) `year`, AVG(CAST(comb08 AS FLOAT)) mpg
+       FROM dfs.`/Users/ngriffith/Downloads/vehicles.csvh`
+   GROUP BY `year`
+   ORDER BY `year`;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;helps answer the first question about model years, while&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW displacement_mpg AS
+     SELECT CAST(displ AS FLOAT) displacement, AVG(CAST(comb08 AS FLOAT)) mpg
+       FROM dfs.`/Users/ngriffith/Downloads/vehicles.csvh`
+      WHERE displ NOT LIKE &#39;&#39;
+        AND displ NOT LIKE &#39;NA&#39;
+   GROUP BY displ
+   ORDER BY displacement;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;will allow us tackle the second one about engine sizes.&lt;/p&gt;
+
+&lt;p&gt;The first view looks like this:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT * FROM year_mpg;
++---------+---------------------+
+|  year   |         mpg         |
++---------+---------------------+
+| 1984.0  | 19.881873727087576  |
+| 1985.0  | 19.808348030570254  |
+| 1986.0  | 19.550413223140495  |
+| 1987.0  | 19.228548516439453  |
+| 1988.0  | 19.328318584070797  |
+| 1989.0  | 19.12575888985256   |
+| 1990.0  | 19.000927643784788  |
+| 1991.0  | 18.825971731448764  |
+| 1992.0  | 18.86262265834077   |
+| 1993.0  | 19.104300091491307  |
+| 1994.0  | 19.0122199592668    |
+| 1995.0  | 18.797311271975182  |
+| 1996.0  | 19.584734799482536  |
+| 1997.0  | 19.429133858267715  |
+| 1998.0  | 19.51847290640394   |
+| 1999.0  | 19.61150234741784   |
+| 2000.0  | 19.526190476190475  |
+| 2001.0  | 19.479692645444565  |
+| 2002.0  | 19.168205128205127  |
+| 2003.0  | 19.00095785440613   |
+| 2004.0  | 19.067736185383243  |
+| 2005.0  | 19.193825042881645  |
+| 2006.0  | 18.95923913043478   |
+| 2007.0  | 18.97868561278863   |
+| 2008.0  | 19.27632687447346   |
+| 2009.0  | 19.74070945945946   |
+| 2010.0  | 20.601442741208295  |
+| 2011.0  | 21.10353982300885   |
+| 2012.0  | 21.93755420641804   |
+| 2013.0  | 23.253164556962027  |
+| 2014.0  | 23.70114006514658   |
+| 2015.0  | 24.214953271028037  |
+| 2016.0  | 24.84784446322908   |
+| 2017.0  | 23.571428571428573  |
++---------+---------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Yup, it definitely looks like there&amp;rsquo;s a trend toward higher MPG. But let&amp;rsquo;s calculate the &lt;em&gt;r&lt;/em&gt; value:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT PCORRELATION(`year`, mpg) FROM year_mpg;
+Error: SYSTEM ERROR: SchemaChangeException: Failure while materializing expression.
+Error in expression at index -1.  Error: Missing function implementation: [pcorrelation(FLOAT4-REQUIRED,
+FLOAT8-OPTIONAL)].  Full expression: --UNKNOWN EXPRESSION--.
+...
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Oops! We got an error message instead of an &lt;em&gt;r&lt;/em&gt; value. That&amp;rsquo;s because my &lt;code&gt;PCORRELATION()&lt;/code&gt; function expects two variables
+that are nullable (&amp;lsquo;optional&amp;rsquo;), but the first one that&amp;rsquo;s getting passed is non-nullable (&amp;lsquo;required&amp;rsquo;). This situation is
+what led to the creation of &lt;a href=&#34;http://www.dremio.com/blog/managing-variable-type-nullability/&#34;&gt;this earlier article and its associated
+functions&lt;/a&gt; for stripping and adding nullability to
+variables. The &lt;code&gt;ADD_NULL_FLOAT()&lt;/code&gt; custom function from that piece is exactly what we need to turn &lt;code&gt;`years `&lt;/code&gt; into a
+variable type that &lt;code&gt;PCORRELATION()&lt;/code&gt; can accept.&lt;/p&gt;
+
+&lt;p&gt;So let&amp;rsquo;s try this again:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT PCORRELATION(ADD_NULL_FLOAT(`year`), mpg) FROM year_mpg;
++---------------------+
+|       EXPR$0        |
++---------------------+
+| 0.6870535033886027  |
++---------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Correlation confirmed! It&amp;rsquo;s not the strongest (that would be a value of 1.0), but it&amp;rsquo;s definitely there. Neat!&lt;/p&gt;
+
+&lt;p&gt;Now to take a look at how engine size related. The view I created contains this data:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT * FROM displacement_mpg;
++---------------+---------------------+
+| displacement  |         mpg         |
++---------------+---------------------+
+| 0.0           | 87.5                |
+| 0.6           | 39.0                |
+| 0.9           | 35.5                |
+| 1.0           | 37.5030303030303    |
+| 1.1           | 19.916666666666668  |
+| 1.2           | 30.81081081081081   |
+| 1.3           | 28.904255319148938  |
+| 1.4           | 30.658959537572255  |
+| 1.5           | 29.439592430858806  |
+| 1.6           | 26.48841961852861   |
+| 1.7           | 28.842105263157894  |
+| 1.8           | 24.91231463571889   |
+| 1.9           | 27.038277511961724  |
+| 2.0           | 24.032035928143713  |
+| 2.1           | 19.28301886792453   |
+| 2.2           | 22.07820419985518   |
+| 2.3           | 21.026008968609865  |
+| 2.4           | 22.373468300479487  |
+| 2.5           | 21.628227194492254  |
+| 2.6           | 18.123529411764707  |
+| 2.7           | 19.88589211618257   |
+| 2.8           | 18.463019250253293  |
+| 2.9           | 18.772727272727273  |
+| 3.0           | 19.428571428571427  |
+| 3.1           | 19.72156862745098   |
+| 3.2           | 18.25237191650854   |
+| 3.3           | 18.54698795180723   |
+| 3.4           | 18.473317865429234  |
+| 3.5           | 20.02212705210564   |
+| 3.6           | 19.188457008244995  |
+| 3.7           | 18.107468123861565  |
+| 3.8           | 19.115025906735752  |
+| 3.9           | 15.588815789473685  |
+| 4.0           | 16.738241308793455  |
+| 4.1           | 15.873684210526315  |
+| 4.2           | 16.05597014925373   |
+| 4.3           | 16.590775988286968  |
+| 4.4           | 17.094736842105263  |
+| 4.5           | 15.566666666666666  |
+| 4.6           | 16.6696269982238    |
+| 4.7           | 15.282548476454293  |
+| 4.8           | 15.813688212927756  |
+| 4.9           | 14.355113636363637  |
+| 5.0           | 15.2375             |
+| 5.2           | 13.063197026022305  |
+| 5.3           | 15.203412073490814  |
+| 5.4           | 13.902597402597403  |
+| 5.5           | 15.16243654822335   |
+| 5.6           | 14.0                |
+| 5.6           | 14.394736842105264  |
+| 5.7           | 14.780718336483933  |
+| 5.8           | 11.78125            |
+| 5.9           | 11.701183431952662  |
+| 6.0           | 14.462686567164178  |
+| 6.1           | 15.0                |
+| 6.1           | 14.454545454545455  |
+| 6.2           | 16.540930979133226  |
+| 6.3           | 13.705882352941176  |
+| 6.4           | 16.8                |
+| 6.5           | 14.81081081081081   |
+| 6.6           | 15.0                |
+| 6.7           | 13.0                |
+| 6.8           | 10.572463768115941  |
+| 7.0           | 17.4                |
+| 7.4           | 9.75                |
+| 8.0           | 12.347826086956522  |
+| 8.3           | 11.222222222222221  |
+| 8.4           | 15.6                |
++---------------+---------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Which, after making a similar adjustment using &lt;code&gt;ADD_NULL_FLOAT()&lt;/code&gt;, yields a correlation of:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT PCORRELATION(ADD_NULL_FLOAT(displacement), mpg) FROM displacement_mpg;
++---------------------+
+|       EXPR$0        |
++---------------------+
+| -0.679501632464044  |
++---------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;So combined average combined MPG is almost as strongly anti-correlated with engine size as it is correlated with model
+year. There&amp;rsquo;s a fairly clear linear dependence in both cases!&lt;/p&gt;
+
+&lt;p&gt;For my next couple articles I&amp;rsquo;ll be digging even deeper into statistical techniques by implementing and testing a Drill
+function to calculate the probability of events that follow a Poisson distribution. It&amp;rsquo;s shaping up to be a great
+couple of weeks to be reading the Dremio Blog if you&amp;rsquo;re curious about what custom-tuned &amp;lsquo;SQL on anything&amp;rsquo; software can
+do in terms of serious analysis.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>What can LIGO see? Let&#39;s look at gravitational waves with SQL</title>
+      <link>/kstirman.github.io/bookshelf/blog/what-can-ligo-see-lets-look-at-gravitational-waves-with-sql/</link>
+      <pubDate>Thu, 11 Feb 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/what-can-ligo-see-lets-look-at-gravitational-waves-with-sql/</guid>
+      <description>&lt;script type=&#34;text/javascript&#34;
+ src=&#34;http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML&#34;&gt;
+&lt;/script&gt;
+
+&lt;p&gt;It&amp;rsquo;s difficult to overstate how thrilling today&amp;rsquo;s news about gravity waves is. The scientific community has been waiting
+a &lt;em&gt;long&lt;/em&gt; time for this, and verification of the phenomenon has wide reaching implications in the fields of both
+astrophysics and particle physics. Gravity is, after all, the biggest thorn in the side of modern theoretical particle
+physics.&lt;/p&gt;
+
+&lt;p&gt;From a particle-centric standpoint gravity wave detection is identical to &amp;lsquo;graviton&amp;rsquo; detection. This is important
+because gravitons amount to the &amp;lsquo;missing link&amp;rsquo; between the currently disconnected realms of the very big (dictated by
+Einstein&amp;rsquo;s general relativity) and the very small (governed by quantum mechanics). The observation of gravitational
+waves may help to constrain the current multitude of competing quantum gravity theories, leading us closer what&amp;rsquo;s
+frequently called the Holy Grail of physics: a Theory of Everything.&lt;/p&gt;
+
+&lt;p&gt;Because the LIGO gravitational wave observatory is awesome, they&amp;rsquo;ve made some of the data relevant to their gravity wave
+event public (go check out &lt;a href=&#34;https://losc.ligo.org/events/GW150914/&#34;&gt;this site&lt;/a&gt;). As you may have guessed, I&amp;rsquo;m going to
+use &lt;a href=&#34;https://drill.apache.org/docs/drill-in-10-minutes/&#34;&gt;Apache Drill&lt;/a&gt; to say something about the data! In particular
+I&amp;rsquo;ll be investigating just how sensitive their equipment is, and what else they may be able to detect.&lt;/p&gt;
+
+&lt;p&gt;To do this analysis, I&amp;rsquo;ll be looking at the data for the &amp;lsquo;H1&amp;rsquo; LIGO detector shown in the leftmost plots of the top and
+third rows of &lt;a href=&#34;https://losc.ligo.org/events/GW150914/&#34;&gt;Figure 1&lt;/a&gt;. These files are called &lt;code&gt;fig1-observed-H.txt&lt;/code&gt; and
+&lt;code&gt;fig1-residual-H.txt&lt;/code&gt;, and they contain the signal-with-background and background-only time series data. To use these
+with Drill, open them up and remove the first line of the file, which is a comment. Then go edit the &amp;lsquo;dfs&amp;rsquo; plugin JSON
+(go to &lt;a href=&#34;http://localhost:8047/storage/dfs&#34;&gt;http://localhost:8047/storage/dfs&lt;/a&gt; after starting &lt;code&gt;drill-embdedded&lt;/code&gt;) so that you have an entry in &lt;code&gt;&amp;quot;formats&amp;quot;&lt;/code&gt; that
+looks like:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;    &amp;quot;txt&amp;quot;: {
+      &amp;quot;type&amp;quot;: &amp;quot;text&amp;quot;,
+      &amp;quot;extensions&amp;quot;: [
+        &amp;quot;txt&amp;quot;
+      ],
+      &amp;quot;delimiter&amp;quot;: &amp;quot; &amp;quot;
+    },
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;This ensures that Drill knows that to do with a file that ends in &amp;lsquo;.txt&amp;rsquo;, instructing it to treat spaces as the column
+delimiter. With this done, let&amp;rsquo;s write a SQL query to find the standard deviation of the background noise:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT STDDEV(CAST(columns[1] AS FLOAT)) FROM dfs.`/path/to/fig1-residual-H.txt`;
++----------------------+
+|        EXPR$0        |
++----------------------+
+| 0.16534411608717056  |
++----------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;So now let&amp;rsquo;s ask: On average, how many standard deviations away from the noise are the 100 biggest signal data points?
+First, we&amp;rsquo;ll make a view (remember &lt;code&gt;USE dfs.tmp;&lt;/code&gt;):&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW bigsignal AS
+     SELECT ABS(CAST(columns[1] AS FLOAT)/0.165) signal
+       FROM dfs.`/Users/ngriffith/Downloads/LIGO/fig1-observed-H.txt`
+   ORDER BY signal DESC
+      LIMIT 100;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;and then we can take the average:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT AVG(signal) FROM bigsignal;
++--------------------+
+|       EXPR$0       |
++--------------------+
+| 5.884780800703798  |
++--------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Not too far off from the event significance given in &lt;a href=&#34;https://dcc.ligo.org/P150914/public&#34;&gt;the paper&lt;/a&gt; of 5.3 sigma!
+(Although their methodology is admittedly wildly different as well as much more rigorous and subtle.)&lt;/p&gt;
+
+&lt;p&gt;But what exactly &lt;em&gt;is&lt;/em&gt; this signal? Well a LIGO detector works by precisely measuring two identical kilometer-scale
+distances with lasers. The measured distances are are arranged in a cross-pattern, so that any passing gravitational
+waves will cause these lengths to contract or expand relative to one another by different (&lt;em&gt;very tiny!&lt;/em&gt;) amounts. The
+&amp;lsquo;signal&amp;rsquo; numbers that we&amp;rsquo;ve been looking at are the differences between these two lengths. One source of gravity waves
+(and the one that the people who run LIGO indicate in their announcement) is two massive bodies, such as black holes,
+orbiting one another.&lt;/p&gt;
+
+&lt;p&gt;Now let&amp;rsquo;s have a little more fun. The length difference from the data should be directly proportional to the amplitude
+\( A \) of the gravity wave, which in this situation expresses the proportionality (&lt;a href=&#34;https://en.wikipedia.org/wiki/Gravitational_wave#Power_radiated_by_orbiting_bodies&#34;&gt;according to
+Wikipedia&lt;/a&gt;) of:&lt;/p&gt;
+
+&lt;p&gt;$$ A \propto  \frac{m_1 m_2}{R} $$&lt;/p&gt;
+
+&lt;p&gt;where \( m_1 \) and \( m_2 \) are the masses of the orbiting bodies, and \( R \) is the distance of the observer
+from the center of mass of the two-body system.&lt;/p&gt;
+
+&lt;p&gt;Decreasing the observed signal waveform of about 5.88 sigma by half would leave itself us comfortably near 3 sigma
+territory, which is still a very strong indicator for significance (randomly achieving 3 sigma result is about a
+one-in-ten-thousand event). Admittedly from a visual standpoint this wouldn&amp;rsquo;t leave a very strong looking signal, but
+statistical analysis in conjunction with confirmation from another type of observatory (such as one looking at radio or
+gamma rays) may yield useful astrophysical data.&lt;/p&gt;
+
+&lt;p&gt;In the discovery paper the authors list two colliding black holes with similar masses (around 30 times the Sun) as a
+likely source of the event that they observed. They also place the event at a distance of about 1.2 billion light-years
+from Earth. If we can manage to notice gravity wave signals with half the strength, then LIGO would be able to detect
+similar events twice as far away, or with 71% the constituent mass.&lt;/p&gt;
+
+&lt;p&gt;The gravitational wave astronomy revolution has just started, and I&amp;rsquo;m extremely excited to see where it leads us!&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Calculating Pearson&#39;s r using a custom SQL function</title>
+      <link>/kstirman.github.io/bookshelf/blog/calculating-pearsons-r-using-a-custom-SQL-function/</link>
+      <pubDate>Wed, 10 Feb 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/calculating-pearsons-r-using-a-custom-SQL-function/</guid>
+      <description>&lt;script type=&#34;text/javascript&#34;
+ src=&#34;http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML&#34;&gt;
+&lt;/script&gt;
+
+&lt;p&gt;Lately I&amp;rsquo;ve written a lot of custom functions to assist me in my example Drill analyses, but they&amp;rsquo;ve all been of the
+same fundamental type: They take one or more columns of a single row and process them into a single output. The &lt;a href=&#34;https://drill.apache.org/docs/develop-custom-functions-introduction/&#34;&gt;Drill
+documentation&lt;/a&gt; calls these &amp;ldquo;simple&amp;rdquo; functions.
+However there&amp;rsquo;s another class of functions lurking out there&amp;mdash;ones that can accept &lt;em&gt;many&lt;/em&gt; rows of data as input. We
+call them &amp;ldquo;aggregate&amp;rdquo; functions.&lt;/p&gt;
+
+&lt;p&gt;If you&amp;rsquo;re an experienced user of SQL, you&amp;rsquo;re already familiar with a few very common aggregate functions like &lt;code&gt;COUNT()&lt;/code&gt;
+and &lt;code&gt;SUM()&lt;/code&gt;, but you&amp;rsquo;ve probably never written one of your own. Today we&amp;rsquo;re going to change that!&lt;/p&gt;
+
+&lt;p&gt;As I&amp;rsquo;ve discussed in previous articles Drill already has some built-in statistics functions, but the goal of this post
+will be to expand those capabilities even further by implementing an aggregate function to calculate a value called
+Pearson&amp;rsquo;s &lt;em&gt;r&lt;/em&gt;. Values for &lt;em&gt;r&lt;/em&gt; vary from +1 to -1, and indicate the degree to which two variables are linearly correlated
+or anti-correlated, respectively. An &lt;em&gt;r&lt;/em&gt; value at or near 0 indicates that there is no linear relationship between the
+two sets of data points.&lt;/p&gt;
+
+&lt;p&gt;After looking on Wikipedia, the most Drill-friendly equation for Pearson&amp;rsquo;s &lt;em&gt;r&lt;/em&gt; is:&lt;/p&gt;
+
+&lt;p&gt;$$ r = \frac{n \sum x_i y_i - \sum x_i \sum y_i}{ \sqrt{n \sum x_i^2 - \left( \sum x_i \right)^2} \sqrt{n \sum y_i^2 -
+\left( \sum y_i \right)^2}} $$&lt;/p&gt;
+
+&lt;p&gt;where \( x_i \) and \( y_i \) are our data points, and \( n \) is the total number of them.&lt;/p&gt;
+
+&lt;p&gt;Once you&amp;rsquo;ve got a Maven project started for your Drill UDF (a guide is available in the &amp;ldquo;Downloading Maven and starting
+a new project&amp;rdquo; section of &lt;a href=&#34;http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/&#34;&gt;this
+article&lt;/a&gt;), take a look at the source
+for our Pearson&amp;rsquo;s &lt;em&gt;r&lt;/em&gt; function:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;package com.yourgroupidentifier.udf;
+
+import org.apache.drill.exec.expr.DrillAggFunc;
+import org.apache.drill.exec.expr.holders.IntHolder;
+import org.apache.drill.exec.expr.holders.NullableFloat8Holder;
+import org.apache.drill.exec.expr.holders.Float8Holder;
+
+import org.apache.drill.exec.expr.annotations.FunctionTemplate;
+
+import org.apache.drill.exec.expr.annotations.Param;
+import org.apache.drill.exec.expr.annotations.Workspace;
+import org.apache.drill.exec.expr.annotations.Output;
+
+@FunctionTemplate(
+        name = &amp;quot;pcorrelation&amp;quot;,
+        scope = FunctionTemplate.FunctionScope.POINT_AGGREGATE,
+        nulls = FunctionTemplate.NullHandling.INTERNAL
+)
+
+public class PCorrelation implements DrillAggFunc {
+
+    @Param
+    NullableFloat8Holder xInput;
+
+    @Param
+    NullableFloat8Holder yInput;
+
+    @Workspace
+    IntHolder numValues;
+
+    @Workspace
+    Float8Holder xSum;
+
+    @Workspace
+    Float8Holder ySum;
+
+    @Workspace
+    Float8Holder xSqSum;
+
+    @Workspace
+    Float8Holder ySqSum;
+
+    @Workspace
+    Float8Holder xySum;
+
+    @Output
+    Float8Holder output;
+
+    public void setup() {
+        // Initialize values
+        numValues.value = 0;
+        xSum.value = 0;
+        ySum.value = 0;
+        xSqSum.value = 0;
+        ySqSum.value = 0;
+        xySum.value = 0;
+    }
+
+    public void reset() {
+        // Initialize values
+        numValues.value = 0;
+        xSum.value = 0;
+        ySum.value = 0;
+        xSqSum.value = 0;
+        ySqSum.value = 0;
+        xySum.value = 0;
+    }
+
+    public void add() {
+
+        // Only proceed if both floats aren&#39;t nulls
+        if( (xInput.isSet == 1) || (yInput.isSet == 1) ) {
+
+            numValues.value++;
+
+            xSum.value += xInput.value;
+            ySum.value += yInput.value;
+
+            xSqSum.value += xInput.value * xInput.value;
+            ySqSum.value += yInput.value * yInput.value;
+
+            xySum.value += xInput.value * yInput.value;
+        }
+
+    }
+
+    public void output() {
+
+        float n = numValues.value;
+
+        double x = xSum.value;
+        double y = ySum.value;
+
+        double x2 = xSqSum.value;
+        double y2 = ySqSum.value;
+
+        double xy = xySum.value;
+
+        output.value = (n*xy - x*y)/(Math.sqrt(n*x2 - x*x)*Math.sqrt(n*y2 - y*y));
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Yes, that&amp;rsquo;s a chunk of code&amp;mdash;but it&amp;rsquo;s mostly this long because it takes a lot of variables to accomplish the &lt;em&gt;r&lt;/em&gt;
+calculation. Anyway, let&amp;rsquo;s talk about some differences between this aggregate function and the simple ones we&amp;rsquo;ve been
+writing up until now.&lt;/p&gt;
+
+&lt;p&gt;First, up in the function template the scope changes from &lt;code&gt;SIMPLE&lt;/code&gt; to &lt;code&gt;POINT_AGGREGATE&lt;/code&gt;, while the null handling is set
+to &lt;code&gt;INTERNAL&lt;/code&gt; instead of &lt;code&gt;NULL_IF_NULL&lt;/code&gt;. This is because aggregate functions need to determine on their own how to
+process null inputs, rather than let Drill handle it for them as we can do for most simple functions. You&amp;rsquo;ll also notice
+a new annotation, &lt;code&gt;@Workspace&lt;/code&gt;, which is used before variables that assist in the calculation of the result as the
+function moves through each row.&lt;/p&gt;
+
+&lt;p&gt;Another obvious difference is that aggregate functions implement a different set of methods than simple ones. The
+&lt;code&gt;setup()&lt;/code&gt; method remains the same, but &lt;code&gt;output()&lt;/code&gt; takes the place of &lt;code&gt;eval()&lt;/code&gt;. For each row that&amp;rsquo;s processed &lt;code&gt;add()&lt;/code&gt; is
+called, and &lt;code&gt;reset()&lt;/code&gt; is used to determine what the function does when it hits a new set of rows.&lt;/p&gt;
+
+&lt;p&gt;In the next article, I&amp;rsquo;ll take this new &lt;code&gt;PCORRELATION()&lt;/code&gt; function out for a spin on some vehicle data from the EPA.&lt;/p&gt;
+
+&lt;p&gt;(OK, yes, pun very much intended that time.)&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Managing variable type nullability</title>
+      <link>/kstirman.github.io/bookshelf/blog/managing-variable-type-nullability/</link>
+      <pubDate>Tue, 09 Feb 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/managing-variable-type-nullability/</guid>
+      <description>&lt;p&gt;One day you may find yourself with a custom function for Drill that&amp;rsquo;s very particular about the kind of variables that
+it accepts. In particular, it may hold strong opinions about whether or not a variable is allowed to express a &lt;code&gt;NULL&lt;/code&gt;
+value. In fact it may even be &lt;em&gt;you&lt;/em&gt; who wrote this unavoidably fussy function (SPOILER: This is exactly what happened to
+me earlier this week).&lt;/p&gt;
+
+&lt;p&gt;Currently Drill lacks built-in functions to add or strip nullability from variables, but luckily it&amp;rsquo;s very easy to whip
+up a couple UDFs which do exactly that. Today I&amp;rsquo;ll be showcasing two such functions which respectively add and remove
+nullability from Drill &lt;code&gt;FLOAT&lt;/code&gt; variables. As usual you should perform the necessary incantations and summoning rituals
+for creating a custom function project in Maven (see the section &amp;ldquo;Downloading Maven and starting a new project&amp;rdquo; in &lt;a href=&#34;http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/&#34;&gt;this
+article&lt;/a&gt; for a refresher).&lt;/p&gt;
+
+&lt;p&gt;Once you&amp;rsquo;re ready to start thinking about source code, the class associated with the function to add nullability looks
+like:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;package com.yourgroupidentifier.udf;
+
+import org.apache.drill.exec.expr.DrillSimpleFunc;
+import org.apache.drill.exec.expr.holders.NullableFloat8Holder;
+import org.apache.drill.exec.expr.holders.Float8Holder;
+
+import org.apache.drill.exec.expr.annotations.FunctionTemplate;
+import org.apache.drill.exec.expr.annotations.Output;
+import org.apache.drill.exec.expr.annotations.Param;
+
+@FunctionTemplate(
+        name = &amp;quot;add_null_float&amp;quot;,
+        scope = FunctionTemplate.FunctionScope.SIMPLE,
+        nulls = FunctionTemplate.NullHandling.INTERNAL
+)
+
+public class addNullFloat implements DrillSimpleFunc {
+
+    @Param
+    Float8Holder input;
+
+    @Output
+    NullableFloat8Holder output;
+
+    public void setup() {
+    }
+
+    public void eval() {
+        output.isSet = 1;
+        output.value = input.value;
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;while the one for removing nullability is as follows:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;package com.yourgroupidentifier.udf;
+
+import org.apache.drill.exec.expr.DrillSimpleFunc;
+import org.apache.drill.exec.expr.holders.NullableFloat8Holder;
+import org.apache.drill.exec.expr.holders.Float8Holder;
+
+import org.apache.drill.exec.expr.annotations.FunctionTemplate;
+import org.apache.drill.exec.expr.annotations.Output;
+import org.apache.drill.exec.expr.annotations.Param;
+
+@FunctionTemplate(
+        name = &amp;quot;remove_null_float&amp;quot;,
+        scope = FunctionTemplate.FunctionScope.SIMPLE,
+        nulls = FunctionTemplate.NullHandling.INTERNAL
+)
+
+public class removeNullFloat implements DrillSimpleFunc {
+
+    @Param
+    NullableFloat8Holder input;
+
+    @Output
+    Float8Holder output;
+
+    public void setup() {
+    }
+
+    public void eval() {
+        output.value = input.value;
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Remember back in &lt;a href=&#34;http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/&#34;&gt;this post&lt;/a&gt; when I
+thought I was presenting the simplest UDFs I&amp;rsquo;d ever seen demonstrated? Well, these guys are definitely setting a new
+world record. They&amp;rsquo;re just about the smallest custom functions you can code for Drill. But that doesn&amp;rsquo;t mean they&amp;rsquo;re not
+useful! &lt;code&gt;ADD_NULL_FLOAT()&lt;/code&gt; and &lt;code&gt;REMOVE_NULL_FLOAT()&lt;/code&gt; make valuable additions to a Drill power user&amp;rsquo;s toolbox, and I&amp;rsquo;ll
+be putting one of them to work in a post later this week.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Smartest and dumbest subreddits as judged by submission title readability</title>
+      <link>/kstirman.github.io/bookshelf/blog/smartest-and-dumbest-subreddits-as-judged-by-submission-title-readibility/</link>
+      <pubDate>Sat, 06 Feb 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/smartest-and-dumbest-subreddits-as-judged-by-submission-title-readibility/</guid>
+      <description>&lt;p&gt;Alright, time to put the readability UDF from &lt;a href=&#34;http://www.dremio.com/blog/querying-for-reading-level-with-a-simple-udf/&#34;&gt;my last
+post&lt;/a&gt; to work on some data! For today&amp;rsquo;s
+analysis, I&amp;rsquo;ll once again use this &lt;a href=&#34;https://www.reddit.com/r/datasets/comments/3mg812/full_reddit_submission_corpus_now_available_2006/&#34;&gt;Reddit submission
+corpus&lt;/a&gt;, which
+contains submission data from from the years 2006-2015.&lt;/p&gt;
+
+&lt;p&gt;The questions that motivate today&amp;rsquo;s analysis are simple, but fun: Which popular subreddits have the highest average
+submission title reading level? Which ones have the lowest? Or, more glibly, &amp;ldquo;Which subreddits are smart, and which are
+dumb?&amp;rdquo; My custom &lt;code&gt;READABILITY()&lt;/code&gt; function for Drill will help us settle this.&lt;/p&gt;
+
+&lt;p&gt;As usual when performing a slightly sophisticated analysis, I first shuffle the data through some VIEWs in order to
+grapple with it on my terms. In this case the prep work consisted of two VIEWs, which were constructed as follows:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW reddit_readability AS
+     SELECT title, READABILITY(title) ARI, subreddit
+       FROM hdfs.`/data/RS_full_corpus.json`
+      WHERE over_18 = &#39;false&#39;;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;which is in turn fed into:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW reddit AS
+     SELECT subreddit, COUNT(title) posts, AVG(ARI) `avg ARI`
+       FROM reddit_readability
+      GROUP BY subreddit;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;From here the query to ask for &amp;lsquo;smart&amp;rsquo; subreddits (as I&amp;rsquo;ve defined them) is easy:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT subreddit, posts, `avg ARI` FROM reddit WHERE posts &amp;gt; 100000 ORDER BY `avg ARI` DESC LIMIT 10;
++------------------------+---------+---------------------+
+|       subreddit        |  posts  |       avg ARI       |
++------------------------+---------+---------------------+
+| spam                   | 287305  | 15.658034632014635  |
+| longtail               | 134202  | 15.38567146310872   |
+| ModerationLog          | 356311  | 12.622485326455028  |
+| modlog                 | 266188  | 12.477493297559754  |
+| RisingThreads          | 142485  | 11.752936255500762  |
+| worldpolitics          | 163290  | 11.633828401867433  |
+| WritingPrompts         | 150776  | 11.348865875111446  |
+| environment            | 185858  | 11.167274719418218  |
+| Random_Acts_Of_Amazon  | 184420  | 11.14375363175314   |
+| conspiro               | 179705  | 10.868244970017907  |
++------------------------+---------+---------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;These results aren&amp;rsquo;t too surprising. Once the internal Reddit stuff is out of the way you&amp;rsquo;re left with some subjects
+that are pretty stereotypically high-minded: global politics, literary pursuits, and environmental issues. Also
+conspiracy theories, for some reason. That one&amp;rsquo;s weird.&lt;/p&gt;
+
+&lt;p&gt;Alright! On to the dumb stuff!&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT subreddit, posts, `avg ARI` FROM reddit WHERE posts &amp;gt; 100000 ORDER BY `avg ARI` LIMIT 10;
++-----------------------+----------+---------------------+
+|       subreddit       |  posts   |       avg ARI       |
++-----------------------+----------+---------------------+
+| me_irl                | 132477   | -6.597215524826628  |
+| itookapicture         | 226074   | 2.591935687626967   |
+| Fireteams             | 1600719  | 3.1183569978499373  |
+| amiugly               | 108643   | 3.135287171164027   |
+| Kikpals               | 170943   | 3.3521135496701313  |
+| offmychest            | 242639   | 3.794396824263522   |
+| Jokes                 | 163818   | 4.192728884240217   |
+| 4chan                 | 107196   | 4.337776062292176   |
+| GlobalOffensiveTrade  | 823488   | 4.346750167026149   |
+| reactiongifs          | 279156   | 4.464272224403798   |
++-----------------------+----------+---------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Yup. I can see why these subreddits are dumb. They might not be &lt;em&gt;bad&lt;/em&gt;, but they&amp;rsquo;re definitely not exactly intellectual. Instead it looks like they focus on funny stuff (jokes, Internet memes, gifs) and personal vanity.&lt;/p&gt;
+
+&lt;p&gt;I&amp;rsquo;d like to close on a more technical note that may help those of you looking to perform similar analyses: If you want
+to use a Drill UDF in a cluster setting, as I did here (a six-node HDFS configuration, for those curious) be sure to
+copy the relevant .jar files to the &lt;code&gt;jars/3rdparty&lt;/code&gt; directory of each machine&amp;rsquo;s Drill install. That&amp;rsquo;s all the setup required
+to start using the custom functions you&amp;rsquo;ve written on big data right away!&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Querying for reading level with a simple UDF</title>
+      <link>/kstirman.github.io/bookshelf/blog/querying-for-reading-level-with-a-simple-UDF/</link>
+      <pubDate>Fri, 05 Feb 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/querying-for-reading-level-with-a-simple-UDF/</guid>
+      <description>&lt;script type=&#34;text/javascript&#34;
+ src=&#34;http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML&#34;&gt;
+&lt;/script&gt;
+
+&lt;p&gt;Today, just like in &lt;a href=&#34;http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/&#34;&gt;this post&lt;/a&gt; from
+the previous week, I&amp;rsquo;d like to discuss creating a simple custom SQL function for Drill that maps strings to float
+values. Except this week&amp;rsquo;s function is even &lt;em&gt;more&lt;/em&gt; simple because it can fit within a single file and requires no
+instructions in the &lt;code&gt;setup()&lt;/code&gt; method. In fact, this may be the simplest example of a Drill UDF I&amp;rsquo;ve ever seen, so if
+you&amp;rsquo;ve been struggling with how to go about writing your own, the source code I&amp;rsquo;m presenting today maybe a good way to
+get some traction.&lt;/p&gt;
+
+&lt;p&gt;The raison d&amp;rsquo;&amp;ecirc;tre of today &amp;rsquo;s function is to calculate the reading level (or, &amp;lsquo;readability&amp;rsquo;) of a single sentence.
+Many solutions to the problem of readability utilize syllable counts, which are notoriously difficult to arrive at
+computationally. It&amp;rsquo;s possible that a lookup table for those counts would provide satisfactorily speedy results, but the
+algorithm that I&amp;rsquo;ve chosen to implement, called the automated readability index or ARI, avoids this problem by
+altogether using a character count instead. As per the &lt;a href=&#34;https://en.wikipedia.org/wiki/Automated_readability_index&#34;&gt;Wikipedia
+article&lt;/a&gt;, the ARI is arrived at via:&lt;/p&gt;
+
+&lt;p&gt;$$ ARI = 4.71 \frac{characters}{words} + 0.5 \frac{words}{sentences} - 21.43 $$&lt;/p&gt;
+
+&lt;p&gt;However, as I indicated earlier I&amp;rsquo;m only interested in the readability of single sentences in this particular
+application (check out the next article!), so I&amp;rsquo;m going to implicitly set the number of sentences to 1 in the source code
+that comes later.&lt;/p&gt;
+
+&lt;p&gt;But before I talk about source you should probably first get some UDF-creation boilerplate out of the way.  I&amp;rsquo;ve
+discussed how to do this a couple times, but if you&amp;rsquo;re still unsure of what to do go ahead and follow the instructions
+in the &amp;ldquo;Downloading Maven and starting a new project&amp;rdquo; section near the beginning of &lt;a href=&#34;http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/&#34;&gt;this
+article&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Once that&amp;rsquo;s out of the way, place this single file (&lt;code&gt;Readability.java&lt;/code&gt;) in your project&amp;rsquo;s
+&lt;code&gt;main/java/com/yourgroupidentifier/udf&lt;/code&gt; directory:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;package com.yourgroupidentifier.udf;
+
+import org.apache.drill.exec.expr.DrillSimpleFunc;
+import org.apache.drill.exec.expr.holders.NullableFloat8Holder;
+import org.apache.drill.exec.expr.holders.NullableVarCharHolder;
+
+import org.apache.drill.exec.expr.annotations.FunctionTemplate;
+import org.apache.drill.exec.expr.annotations.Output;
+import org.apache.drill.exec.expr.annotations.Param;
+
+@FunctionTemplate(
+        name = &amp;quot;readability&amp;quot;,
+        scope = FunctionTemplate.FunctionScope.SIMPLE,
+        nulls = FunctionTemplate.NullHandling.NULL_IF_NULL
+)
+
+public class Readability implements DrillSimpleFunc {
+
+    @Param
+    NullableVarCharHolder input;
+
+    @Output
+    NullableFloat8Holder out;
+
+    public void setup() {
+    }
+
+    public void eval() {
+
+        // The length of &#39;pneumonoultramicroscopicsilicovolcanoconiosis&#39;
+        final int longestWord = 45;
+
+        // Initialize output value
+        out.value = 0.0;
+
+        // Split input string up into words
+        String inputString = org.apache.drill.exec.expr.fn.impl.StringFunctionHelpers.toStringFromUTF8(input.start,
+input.end, input.buffer);
+        String[] inputStringWords = inputString.split(&amp;quot;\\s+&amp;quot;);
+
+        float numWords = inputStringWords.length;
+        float numCharacters = inputString.length() - (numWords-1); // Accounts for spaces
+
+        // Adjust for things in the text that aren&#39;t words
+        // i.e., They are longer than &#39;longestWord&#39;
+        for(int i = 0; i &amp;lt; inputStringWords.length; i++) {
+            if( inputStringWords[i].length() &amp;gt; longestWord) {
+                numWords--;
+                numCharacters = numCharacters - inputStringWords[i].length();
+            }
+        }
+
+        // Output &#39;NULL&#39; if the number of words is zero
+        if(numWords != 0) {
+            out.value = 4.71 * (numCharacters / numWords) + 0.5 * (numWords) - 21.43;
+        }
+        else {
+            out.isSet = 0;
+        }
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;This is pretty straight forward compared to the &lt;a href=&#34;http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/&#34;&gt;other
+examples&lt;/a&gt; I&amp;rsquo;ve &lt;a href=&#34;http://www.dremio.com/blog/querying-google-analytics-json-with-a-custom-sql-function/&#34;&gt;discussed
+before&lt;/a&gt;, right? Just about the
+only &amp;lsquo;trick&amp;rsquo; here is that I&amp;rsquo;ve made the number the function returns a &amp;lsquo;Nullable&amp;rsquo; type. This is to insure that it has a
+more sane output than &amp;lsquo;Infinity&amp;rsquo; when it encounters a field with zero words&amp;mdash;especially useful for when the
+function is used in conjunction with &lt;code&gt;AVG()&lt;/code&gt;, which disregards NULL values but would propagate any &amp;lsquo;Infinity&amp;rsquo; to the
+final result.&lt;/p&gt;
+
+&lt;p&gt;In the next post, we&amp;rsquo;ll try this function out in the &amp;lsquo;field&amp;rsquo; on one of my favorite data sets!&lt;/p&gt;
+
+&lt;p&gt;(And I &lt;em&gt;swear&lt;/em&gt; I didn&amp;rsquo;t make that pun intentionally.)&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>The case of the stolen candy hearts: Advanced date parsing in SQL</title>
+      <link>/kstirman.github.io/bookshelf/blog/the-case-of-the-stolen-candy-hearts-advanced-date-parsing-in-sql/</link>
+      <pubDate>Tue, 02 Feb 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/the-case-of-the-stolen-candy-hearts-advanced-date-parsing-in-sql/</guid>
+      <description>&lt;p&gt;The other day I had 12 years of &lt;a href=&#34;https://data.sfgov.org/Public-Safety/Map-Crime-Incidents-from-1-Jan-2003/gxxq-x39z&#34;&gt;San Francisco crime
+data&lt;/a&gt; loaded in Drill and I wanted
+to answer the following question: Which days from recent years have the highest incidences of crime?&lt;/p&gt;
+
+&lt;p&gt;As it turns out, this isn&amp;rsquo;t that difficult to accomplish, but it did add some new functions to my repertoire, so I
+thought I&amp;rsquo;d share the process with you.&lt;/p&gt;
+
+&lt;p&gt;Once I got a hold of the SF crime download, I renamed it to a file with a &amp;lsquo;.csvh&amp;rsquo; extension so I could address the data
+by the column name given in the header. And as we can see in this simple query of the data&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT Category, `Date`, `Time`, Address FROM dfs.`/path/to/sfcrime.csvh` LIMIT 5;
++------------------------------+-------------+--------+---------------------------+
+|           Category           |    Date     |  Time  |          Address          |
++------------------------------+-------------+--------+---------------------------+
+| VANDALISM                    | 01/14/2016  | 23:45  | 3600 Block of ALEMANY BL  |
+| ASSAULT                      | 01/14/2016  | 23:45  | 0 Block of DRUMM ST       |
+| OTHER OFFENSES               | 01/14/2016  | 23:29  | PALOU AV / LANE ST        |
+| DRIVING UNDER THE INFLUENCE  | 01/14/2016  | 23:29  | PALOU AV / LANE ST        |
+| OTHER OFFENSES               | 01/14/2016  | 23:00  | 100 Block of DAKOTA ST    |
++------------------------------+-------------+--------+---------------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;the column labeled &amp;lsquo;Date&amp;rsquo; follows the &amp;lsquo;MM/dd/yyy&amp;rsquo; format, so I&amp;rsquo;ll want to keep that in mind when I use the &lt;code&gt;TO_DATE()&lt;/code&gt;
+function to transform that entry from a string to a &lt;code&gt;DATE&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;But remember, the ultimate goal is to find out which days of a given year have the highest crime. To do this I&amp;rsquo;ll need
+to make use of the &lt;code&gt;EXTRACT()&lt;/code&gt; function to pull the month, day, and year number from my newly constructed &lt;code&gt;DATE&lt;/code&gt; types.
+This is the function that was new to me, but thankfully it&amp;rsquo;s very easy to understand. You just specify which component
+of the date you&amp;rsquo;d like to pull as part of the argument, as in:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;EXTRACT(day FROM myDate)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;I ended up converting the &amp;lsquo;Date&amp;rsquo; column and performing the necessary EXTRACTs at the same time in this view (remember to
+&lt;code&gt;USE dfs.tmp;&lt;/code&gt; before entering this command):&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW crimedays AS
+     SELECT EXTRACT(month FROM TO_DATE(`Date`,&#39;MM/dd/yyyy&#39;)) month_num, EXTRACT(day FROM TO_DATE(`Date`,&#39;MM/dd/yyyy&#39;)) day_num,
+            EXTRACT(year FROM TO_DATE(`Date`,&#39;MM/dd/yyyy&#39;)) year_num, IncidntNum id, Category type
+       FROM dfs.`/path/to/sfcrime.csvh`;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;So now all it takes is a query with two GROUP BYs on the month and day number to come up with a list of high crime days
+for a previous year. Let&amp;rsquo;s take a look at 2014:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;  SELECT month_num, day_num, year_num, COUNT(id) crimes
+    FROM crimedays
+   WHERE year_num = 2014
+GROUP BY month_num, day_num, year_num
+ORDER BY crimes DESC
+   LIMIT 5;
++------------+----------+-----------+---------+
+| month_num  | day_num  | year_num  | crimes  |
++------------+----------+-----------+---------+
+| 10         | 11       | 2014      | 521     |
+| 2          | 14       | 2014      | 514     |
+| 3          | 19       | 2014      | 513     |
+| 8          | 8        | 2014      | 511     |
+| 8          | 9        | 2014      | 509     |
++------------+----------+-----------+---------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Apparently February 14th was an especially high crime day that year. So this coming Valentine&amp;rsquo;s Day, don&amp;rsquo;t forget to buy
+your significant other something nice. But also maybe take some extra care making sure no one steals it before you can
+give it to them!&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Reddit hates George Bush more than Vladimir Putin</title>
+      <link>/kstirman.github.io/bookshelf/blog/reddit-hates-george-bush-more-than-vladimir-putin/</link>
+      <pubDate>Fri, 29 Jan 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/reddit-hates-george-bush-more-than-vladimir-putin/</guid>
+      <description>&lt;p&gt;Just as I promised, today I&amp;rsquo;m going to show off that nifty sentiment analysis UDF for Apache Drill that I discussed in
+&lt;a href=&#34;http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/&#34;&gt;the last article&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Today&amp;rsquo;s data is &lt;a href=&#34;http://www.dremio.com/blog/old-and-busted-teasing-formerly-fashionable-websites-from-reddit-data/&#34;&gt;once
+again&lt;/a&gt; provided by
+this &lt;a href=&#34;https://www.reddit.com/r/datasets/comments/3mg812/full_reddit_submission_corpus_now_available_2006/&#34;&gt;awesome dump of Reddit
+submissions&lt;/a&gt; that
+date from 2006 up through last summer. Basically I just ran the sentiment analyzer function through submission titles,
+examining a selection of politicians that I thought Reddit might feel strongly about.&lt;/p&gt;
+
+&lt;p&gt;In terms of nitty-gritty Drill stuff, I started by first making a view for the data that includes the sentiment score as
+computed by the star of yesterday&amp;rsquo;s post, the &lt;code&gt;SIMPLESENT()&lt;/code&gt; function:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; USE dfs.tmp;
+&amp;gt; CREATE VIEW testview AS SELECT LOWER(title) title, TO_TIMESTAMP(CAST(created_utc AS INT)) created, score, SIMPLESENT(title) sentiment FROM hdfs.`/data/RS_full_corpus.json`;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And from there I just computed a simple average of those scores over the entire corpus:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT AVG(sentiment) FROM testview WHERE title LIKE &#39;%donald trump%&#39;;
++------------------------+
+|         EXPR$0         |
++------------------------+
+| -0.052544239386344636  |
++------------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Remember negative scores indicate negative feelings, and likewise for positive scores. The somewhat surprising results
+are compiled below in Figure 1.&lt;/p&gt;
+
+&lt;p&gt;&lt;p style=&#34;text-align: center;&#34;&gt;
+&lt;img style=&#34;max-width: 100%;&#34; src=&#34;kstirman.github.io/bookshelf/img/reddit_politicians.png&#34;&gt;
+&lt;/p&gt;
+&lt;p style=&#34;text-align: center; font-style: italic;&#34;&gt;&lt;b&gt;Figure 1&lt;/b&gt;: Sentiment analysis for various politicians based on
+Reddit submission title.&lt;/p&gt;
+&lt;br&gt;
+&lt;br&gt;
+&lt;br&gt;
+&lt;br&gt;&lt;/p&gt;
+
+&lt;p&gt;So, yes, according to this sentiment analysis, Reddit definitely dislikes George Bush more than Vladimir Putin. I always
+think of Reddit as overall leaning a bit left in terms of politics, so it didn&amp;rsquo;t shock me to see Barack Obama and Bernie
+Sanders show up with positive values. However, it &lt;em&gt;did&lt;/em&gt; surprise me to see Hillary Clinton score negatively. And not
+only that, she scored even &lt;em&gt;more&lt;/em&gt; negatively than Sarah Palin!&lt;/p&gt;
+
+&lt;p&gt;Finally, those of us who were frequent redditors during the 2008 election season will be far from confused by the
+average sentiment score achieved by then nominal-Republican Ron Paul.&lt;/p&gt;
+
+&lt;p&gt;Reddit loves that guy.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Writing a custom SQL function for sentiment analysis</title>
+      <link>/kstirman.github.io/bookshelf/blog/writing-a-custom-SQL-function-for-sentiment-analysis/</link>
+      <pubDate>Thu, 28 Jan 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/writing-a-custom-SQL-function-for-sentiment-analysis/</guid>
+      <description>
+
+&lt;p&gt;In the world of data analytics a &amp;lsquo;sentiment analysis&amp;rsquo; is any technique that attempts to represent the feelings of users
+in a somewhat quantitative way. Implementations of this idea vary, but one of the simplest ones involves giving
+individual words a numeric score according to the strength of the positive or negative the emotions that they elicit.
+For instance we might assign a score of -2.3 to the word &amp;lsquo;disappointment&amp;rsquo; and a score of 1.8 to &amp;lsquo;lighthearted.&amp;rsquo;&lt;/p&gt;
+
+&lt;p&gt;In today&amp;rsquo;s article I&amp;rsquo;m going to demonstrate that writing a custom SQL function (also known as a user defined function,
+or UDF) that performs a sentiment analysis is a fairly straightforward task. The SQL platform we&amp;rsquo;ll be using for this
+project is Apache Drill; A software capable of querying &lt;em&gt;many&lt;/em&gt; different types of data stores that also allows for the
+creation of custom functions written in the Java programming language.&lt;/p&gt;
+
+&lt;p&gt;This isn&amp;rsquo;t the first time I&amp;rsquo;ve written about creating a UDF for Drill, and readers looking for a richer set of
+information about UDF programming may want to refer to &lt;a href=&#34;http://www.dremio.com/blog/querying-google-analytics-json-with-a-custom-sql-function/&#34;&gt;this earlier
+article&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h2 id=&#34;downloading-maven-and-starting-a-new-project&#34;&gt;Downloading Maven and starting a new project&lt;/h2&gt;
+
+&lt;p&gt;Just as before, we&amp;rsquo;ll want to start by downloading and installing Apache Maven (&lt;a href=&#34;https://maven.apache.org/download.cgi&#34;&gt;available
+here&lt;/a&gt;), which will be responsible for managing and building our Java project:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ tar xzvf apache-maven-3.3.9-bin.tar.gz
+$ mv apache-maven-3.3.9 apache-maven
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And since you&amp;rsquo;ll probably be using it fairly frequently it might be nice to put the Maven binary in the PATH environment
+variable, so add this line to your &lt;code&gt;.bashrc&lt;/code&gt; file:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;export PATH=$PATH:~/apache-maven/bin
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now go to whatever directory you&amp;rsquo;d like to store your UDFs in and issue this Maven command to create a new project for
+our sentiment analyzer called &amp;lsquo;simplesentiment&amp;rsquo;:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ mvn archetype:generate -DgroupId=com.dremio.app -DartifactId=simplesentiment -DinteractiveMode=false
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Because our UDF relies on Apache Drill, we&amp;rsquo;ll need to add a couple things to the project&amp;rsquo;s &lt;code&gt;pom.xml&lt;/code&gt; configuration file.
+The first should go within the &lt;code&gt;&amp;lt;dependencies&amp;gt;&lt;/code&gt; tag:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;lt;dependency&amp;gt;
+  &amp;lt;groupId&amp;gt;org.apache.drill.exec&amp;lt;/groupId&amp;gt;
+  &amp;lt;artifactId&amp;gt;drill-java-exec&amp;lt;/artifactId&amp;gt;
+  &amp;lt;version&amp;gt;1.4.0&amp;lt;/version&amp;gt;
+&amp;lt;/dependency&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;and the next should go inside the outermost tag called &lt;code&gt;&amp;lt;project&amp;gt;&lt;/code&gt;:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;lt;build&amp;gt;
+  &amp;lt;plugins&amp;gt;
+    &amp;lt;plugin&amp;gt;
+      &amp;lt;groupId&amp;gt;org.apache.maven.plugins&amp;lt;/groupId&amp;gt;
+      &amp;lt;artifactId&amp;gt;maven-source-plugin&amp;lt;/artifactId&amp;gt;
+      &amp;lt;version&amp;gt;2.4&amp;lt;/version&amp;gt;
+      &amp;lt;executions&amp;gt;
+        &amp;lt;execution&amp;gt;
+          &amp;lt;id&amp;gt;attach-sources&amp;lt;/id&amp;gt;
+          &amp;lt;phase&amp;gt;package&amp;lt;/phase&amp;gt;
+          &amp;lt;goals&amp;gt;
+            &amp;lt;goal&amp;gt;jar-no-fork&amp;lt;/goal&amp;gt;
+          &amp;lt;/goals&amp;gt;
+        &amp;lt;/execution&amp;gt;
+      &amp;lt;/executions&amp;gt;
+    &amp;lt;/plugin&amp;gt;
+  &amp;lt;/plugins&amp;gt;
+&amp;lt;/build&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Finally we need to make a &lt;code&gt;./src/main/resources/drill-module.conf&lt;/code&gt; file for the project (you&amp;rsquo;ll probably need to create
+the &amp;lsquo;resources&amp;rsquo; directory, so go ahead and do that). This file should have these contents:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;drill {
+  classpath.scanning {
+    packages : ${?drill.classpath.scanning.packages} [
+      com.yourgroupidentifier.udf
+    ]
+  }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Where &lt;code&gt;com.yourgroupidentifier.udf&lt;/code&gt; should be the same name as the &lt;code&gt;package&lt;/code&gt; specified in the Java files listed in the
+next section.&lt;/p&gt;
+
+&lt;h2 id=&#34;sentiment-analysis-udf-source-code&#34;&gt;Sentiment analysis UDF source code&lt;/h2&gt;
+
+&lt;p&gt;The sentiment analyzer in my UDF follows the simple algorithm that I described earlier, with the values for words
+provided by &lt;a href=&#34;https://github.com/cjhutto/vaderSentiment/blob/master/build/lib/vaderSentiment/vader_sentiment_lexicon.txt&#34;&gt;this
+file&lt;/a&gt;
+(&lt;code&gt;vader_sentiment_lexicon.txt&lt;/code&gt;) available on Github from user &amp;lsquo;cjhutto.&amp;rsquo;&lt;/p&gt;
+
+&lt;p&gt;Because Drill is picky about the format of a UDF class, this custom function had to be expressed in two different source
+files: one to define all the function&amp;rsquo;s operations, and another for a simple class to hold the dictionary that
+translates words to numeric sentiment values. For this project, these files will be located in the project&amp;rsquo;s
+&lt;code&gt;main/java/com/yourgroupidentifier/udf&lt;/code&gt; directory.&lt;/p&gt;
+
+&lt;p&gt;The first file, &lt;code&gt;simpleSent.java&lt;/code&gt; looks like:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;package com.yourgroupidentifier.udf;
+
+import org.apache.drill.exec.expr.DrillSimpleFunc;
+import org.apache.drill.exec.expr.holders.Float8Holder;
+import org.apache.drill.exec.expr.holders.NullableVarCharHolder;
+
+import org.apache.drill.exec.expr.annotations.FunctionTemplate;
+import org.apache.drill.exec.expr.annotations.Output;
+import org.apache.drill.exec.expr.annotations.Param;
+
+@FunctionTemplate(
+        name = &amp;quot;simplesent&amp;quot;,
+        scope = FunctionTemplate.FunctionScope.SIMPLE,
+        nulls = FunctionTemplate.NullHandling.NULL_IF_NULL
+)
+
+public class simpleSent implements DrillSimpleFunc {
+
+    // The input to the function---almost certainly a text field
+    @Param
+    NullableVarCharHolder input;
+
+    // The output of the function---just a number
+    @Output
+    Float8Holder out;
+
+    public void setup() {
+
+        // Initialize object that holds dictionary
+        new com.yourgroupidentifier.udf.dictHolder();
+
+        // Open the sentiment values file
+        try {
+            java.io.FileReader fileReader = new java.io.FileReader(&amp;quot;/path/to/vader_sentiment_lexicon.txt&amp;quot;);
+            java.io.BufferedReader bufferedReader = new java.io.BufferedReader(fileReader);
+
+            String currLine;
+
+            // Read each line
+            try {
+                while ((currLine = bufferedReader.readLine()) != null) {
+                    String[] splitLine = currLine.split(&amp;quot;\\s+&amp;quot;);
+
+                    String currWord = splitLine[0];
+                    Double currValue;
+                    try {
+                        currValue = Double.parseDouble(splitLine[1]);
+                    }
+                    catch (java.lang.NumberFormatException numberEx) {
+                        currValue = 0.0;
+                    }
+
+                    // Put sentiment value in dictionary
+                    com.yourgroupidentifier.udf.dictHolder.sentiDict.put(currWord, currValue);
+                }
+            }
+            catch(java.io.IOException ioEx) {
+                System.out.print(&amp;quot;IOException encountered&amp;quot;);
+            }
+
+        }
+        catch(java.io.FileNotFoundException fileEx) {
+            System.out.println(&amp;quot;Sentiment valences file not found!&amp;quot;);
+        }
+    }
+
+    public void eval() {
+
+        // Initialize output value
+        out.value = 0.0;
+
+        // Split up the input string
+        String inputString = org.apache.drill.exec.expr.fn.impl.StringFunctionHelpers.toStringFromUTF8(input.start, input.end, input.buffer);
+        String[] splitInputString = inputString.split(&amp;quot;\\s+&amp;quot;);
+
+        for(int i = 0; i &amp;lt; splitInputString.length; i++) {
+
+            java.lang.Object result = com.yourgroupidentifier.udf.dictHolder.sentiDict.get(splitInputString[i].toLowerCase());
+
+            if(result != null) {
+
+                Double wordValue = ((Double) result);
+
+                out.value += wordValue;
+            }
+        }
+
+    }
+
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;(Remember to change the line with &lt;code&gt;/path/to/vader_sentiment_lexicon.txt&lt;/code&gt; so that it reflects the location of the file on
+your system!)&lt;/p&gt;
+
+&lt;p&gt;The second file is called &lt;code&gt;dictHolder.java&lt;/code&gt;, and contains this small class:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;package com.yourgroupidentifier.udf;
+
+public class dictHolder {
+    static public java.util.Hashtable&amp;lt;String, Double&amp;gt; sentiDict;
+
+    public dictHolder() {
+        sentiDict = new java.util.Hashtable&amp;lt;String, Double&amp;gt;();
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;building-and-installing-our-udf&#34;&gt;Building and installing our UDF&lt;/h2&gt;
+
+&lt;p&gt;To build and install the custom function, just go to the project&amp;rsquo;s root directory (the one with &lt;code&gt;pom.xml&lt;/code&gt;) and issue
+these commands&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ mvn clean package
+$ cp target/*.jar ~/apache-drill/jars/3rdparty
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;changing the second command to be appropriate for your Drill install.&lt;/p&gt;
+
+&lt;p&gt;And that&amp;rsquo;s literally all there is to it! You should now be able to invoke the &lt;code&gt;SIMPLESENT()&lt;/code&gt; function from within
+Drill&amp;rsquo;s SQL prompt. In the next article I&amp;rsquo;ll be doing exactly that as I explore a corpus of Reddit submission titles
+using this handy new analysis tool.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Securing SQL on Hadoop, Part 2: Installing and configuring Drill</title>
+      <link>/kstirman.github.io/bookshelf/blog/securing-SQL-on-Hadoop-part-2-installing-and-configuring-Drill/</link>
+      <pubDate>Mon, 25 Jan 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/securing-SQL-on-Hadoop-part-2-installing-and-configuring-Drill/</guid>
+      <description>
+
+&lt;p&gt;Today we&amp;rsquo;re going to pick up where we left off in &lt;a href=&#34;http://www.dremio.com/blog/securing-sql-on-hadoop-part-1-installing-cdh-and-kerberos/&#34;&gt;Part
+1&lt;/a&gt; of my two-parter about setting
+up a CDH cluster to perform secure SQL queries on an HDFS store. As you recall, last time we had just finished using
+Cloudera Manager&amp;rsquo;s wizard to finalize a Kerberos configuration, and all of the cluster services had come back online
+using the new security system so our basic HDFS cluster set-up was good to go. All that&amp;rsquo;s left to do now is install and
+configure the piece of software that implements the SQL interface: Apache Drill.&lt;/p&gt;
+
+&lt;h2 id=&#34;step-1-drill-prerequisites&#34;&gt;Step 1.) Drill prerequisites&lt;/h2&gt;
+
+&lt;p&gt;First things first: We&amp;rsquo;re gonna need Java 7 or better on our CDH machines. Following some useful information found
+&lt;a href=&#34;http://lifeonubuntu.com/ubuntu-missing-add-apt-repository-command/&#34;&gt;here&lt;/a&gt; and
+&lt;a href=&#34;http://askubuntu.com/questions/508546/howto-upgrade-java-on-ubuntu-14-04-lts&#34;&gt;here&lt;/a&gt;, we can set up a new package
+repository and pull it down using:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ sudo apt-get install software-properties-common python-software-properties
+$ sudo add-apt-repository ppa:webupd8team/java
+$ sudo apt-get update
+$ sudo apt-get install oracle-java7-installer
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;(Remember to do this for each node on your cluster!)&lt;/p&gt;
+
+&lt;h2 id=&#34;step-2-install-drill&#34;&gt;Step 2.) Install Drill&lt;/h2&gt;
+
+&lt;p&gt;Time to install Drill and tell it where the cluster&amp;rsquo;s &amp;lsquo;Zookeeper&amp;rsquo; is (REMEMBER: Just like installing Java, this step
+needs to be done on every node). Start by downloading and unpacking the software:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ wget http://apache.osuosl.org/drill/drill-1.4.0/apache-drill-1.4.0.tar.gz
+$ tar xzvf apache-drill-1.4.0.tar.gz
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Next edit Drill&amp;rsquo;s &lt;code&gt;conf/drill-override.conf&lt;/code&gt; file so that it looks like:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;drill.exec: {
+  cluster-id: &amp;quot;drill-cdh-cluster&amp;quot;,
+  zk.connect: &amp;quot;&amp;lt;ZOOKEEPER IP&amp;gt;:2181&amp;quot;
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Where &amp;lsquo;ZOOKEEPER IP&amp;rsquo; should be changed to the IP of the CDH machine that runs the zookeeper process (this is probably
+the same as the Main Node from the last article).&lt;/p&gt;
+
+&lt;p&gt;If you&amp;rsquo;d like, you can add Drill to the system path by adding this to &lt;code&gt;.bashrc&lt;/code&gt;:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;export PATH=$PATH:/apache-drill-1.4.0/bin
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;step-3-configuring-drill-for-hdfs&#34;&gt;Step 3.) Configuring Drill for HDFS&lt;/h2&gt;
+
+&lt;p&gt;Now we need to set up Drill so that it can read our cluster&amp;rsquo;s HDFS. Open the Drill Web Console by going to
+http://&amp;lt;MAIN NODE IP&amp;gt;:8047. Click &amp;lsquo;Storage&amp;rsquo; at the top and then &amp;lsquo;Update&amp;rsquo; next to the dfs plugin and copy the JSON
+that you find in the text field. Next make a new storage plugin called &amp;lsquo;hdfs&amp;rsquo; (previous page) and then paste in the text
+you just copied, replacing the &amp;lsquo;null&amp;rsquo; that&amp;rsquo;s already there.&lt;/p&gt;
+
+&lt;p&gt;We&amp;rsquo;ll proceed by making a small modification that turns this standard &amp;lsquo;dfs&amp;rsquo; plugin in into our new one for HDFS.&lt;/p&gt;
+
+&lt;p&gt;Take the line&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;quot;connection&amp;quot;: &amp;quot;file:///&amp;quot;,
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;and replace it with&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;quot;connection&amp;quot;: &amp;quot;hdfs://&amp;lt;ADDRESS OF HDFS NAMENODE&amp;gt;:8020&amp;quot;,
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Hit &amp;ldquo;Create&amp;rdquo; and now Drill is ready to read your HDFS data!&lt;/p&gt;
+
+&lt;h2 id=&#34;step-4-enabling-kerberos-support-for-drill&#34;&gt;Step 4.) Enabling Kerberos support for Drill&lt;/h2&gt;
+
+&lt;p&gt;So now we have HDFS, Kerberos, &lt;em&gt;and&lt;/em&gt; Drill, but currently Drill can&amp;rsquo;t talk to the HDFS we have running because it
+requires authentication. Let&amp;rsquo;s fix that.&lt;/p&gt;
+
+&lt;p&gt;First we should make an HDFS superuser account as indicated in this &lt;a href=&#34;http://www.cloudera.com/documentation/enterprise/latest/topics/cm_sg_s5_hdfs_principal.html&#34;&gt;Cloudera
+doc&lt;/a&gt;. On the Main Node, run
+&lt;code&gt;sudo kadmin.local&lt;/code&gt; and add an &amp;lsquo;hdfs&amp;rsquo; principal with this command:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;addprinc hdfs@KERBEROS.CDH
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;(Hit Ctrl-d to exit the prompt). In order to enable authentication with Kerberos, we also need to copy the file
+&lt;code&gt;hadoop-yarn-api.jar&lt;/code&gt; into Drill&amp;rsquo;s class path:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ cp /opt/cloudera/parcels/CDH-5.5.1-1.cdh5.5.1.p0.11/lib/hadoop/client/hadoop-yarn-api.jar ~/apache-drill/jars/
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;(NOTE: &lt;em&gt;The above step and the three following must be performed on each node of the cluster&lt;/em&gt;.)&lt;/p&gt;
+
+&lt;p&gt;Next, Drill&amp;rsquo;s &lt;code&gt;conf/core-site.xml&lt;/code&gt; file should be edited to contain the following snippet of xml:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;lt;property&amp;gt;
+  &amp;lt;name&amp;gt;hadoop.security.authentication&amp;lt;/name&amp;gt;
+  &amp;lt;value&amp;gt;kerberos&amp;lt;/value&amp;gt;
+&amp;lt;/property&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;All that&amp;rsquo;s left to do is create an &amp;lsquo;hdfs&amp;rsquo; Kerberos ticket for the user that we&amp;rsquo;re logged into&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ kinit hdfs@KERBEROS.CDH
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;and then start up each of the drillbits&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;drillbit.sh start
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;So now Drill has both the configuration and the authority to use our kerberized HDFS store. Give it a shot by opening up
+a Drill prompt (&lt;code&gt;drill-conf&lt;/code&gt;) and trying a query.&lt;/p&gt;
+
+&lt;p&gt;For example, here&amp;rsquo;s a test query on my handy 250 GB of Reddit data:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT title, TO_TIMESTAMP(CAST(created_utc AS INT)) created, score FROM hdfs.`/data/RS_full_corpus.json` WHERE over_18 = false AND score &amp;gt;= 100 LIMIT 10;
++------------------------------------------------------------------------------+------------------------+--------+
+|                                    title                                     |        created         | score  |
++------------------------------------------------------------------------------+------------------------+--------+
+| Early Retirement Guide - Phillip Greenspun                                   | 2006-01-30 19:21:17.0  | 223    |
+| Programming Like A Mathematician I: Closures                                 | 2006-01-29 18:14:30.0  | 178    |
+| More than 1000 wikipedia alterations by US Representative Staffers           | 2006-01-29 12:57:45.0  | 304    |
+| Great Design: What is Design?                                                | 2006-01-26 20:54:30.0  | 143    |
+| Use Python (not Java) to teach programming                                   | 2006-01-26 19:43:23.0  | 167    |
+| The Demotivators!                                                            | 2006-01-26 18:02:51.0  | 168    |
+| Just how much can you achieve with pure CSS? Some amazing demonstrations.    | 2006-02-26 18:07:57.0  | 329    |
+| A summary of two lectures by Alan Kay                                        | 2006-02-24 04:56:49.0  | 110    |
+| How Intel could buy Hollywood and profit by selling more DRM-less machines.  | 2006-02-20 20:48:18.0  | 108    |
+| &amp;quot;zeitgeist&amp;quot; reddits, covering popular topics, eg, the infamous cartoons      | 2006-02-19 19:33:59.0  | 299    |
++------------------------------------------------------------------------------+------------------------+--------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And that wraps up Part 2 of this how-to guide. May all your queries be fruitful and secure!&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;Acknoweldgements: Many thanks to William Witt over on the user@drill.apache.org mailing list for providing crucial
+information about Kerberos-Drill configuration!&lt;/em&gt;&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Securing SQL on Hadoop, Part 1: Installing CDH and Kerberos</title>
+      <link>/kstirman.github.io/bookshelf/blog/securing-SQL-on-Hadoop-part-1-installing-CDH-and-Kerberos/</link>
+      <pubDate>Fri, 22 Jan 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/securing-SQL-on-Hadoop-part-1-installing-CDH-and-Kerberos/</guid>
+      <description>
+
+&lt;h2 id=&#34;introduction&#34;&gt;Introduction&lt;/h2&gt;
+
+&lt;p&gt;In the Dremio Blog we&amp;rsquo;ve talked about pairing Drill with HDFS before, but never with the emphasis on security that so
+often comes hand-in-hand with enterprise applications. So today&amp;rsquo;s post marks the beginning of a two part series
+explaining how to set up a cluster environment that enables &lt;em&gt;secure&lt;/em&gt; SQL queries to data stored on HDFS. For this
+article&amp;rsquo;s test &amp;lsquo;hardware&amp;rsquo; we&amp;rsquo;ll use six instances provisioned from Amazon&amp;rsquo;s EC2 service, while the core software
+components will be provided by Cloudera&amp;rsquo;s Hadoop system, CDH, paired with Ubuntu 14.04. The &amp;lsquo;secure&amp;rsquo; element of this
+cluster environment with be enabled via Kerberos, which is an industry standard in the realm of authentication software.&lt;/p&gt;
+
+&lt;h2 id=&#34;step-1-cluster-set-up&#34;&gt;Step 1.) Cluster Set Up&lt;/h2&gt;
+
+&lt;p&gt;In general I&amp;rsquo;ll be going into a significant amount of detail for this setup, since Kerberos configuration can be, well,
+&lt;em&gt;hard&lt;/em&gt;. I am, however, going to assume right now that you know your way around the AWS Management Console, and can
+handle setting up a few instances and configuring them by yourself. Remember to select &amp;lsquo;Ubuntu 14.04&amp;rsquo; for the operating
+system, and make a security group for the cluster that opens all the the TCP and UDP ports between machines in the
+cluster, just to be sure they can communicate freely with eachother. You&amp;rsquo;ll also want to open all ICMP ports (for ping),
+and TCP port 7180 for the Cloudera Manager software that we&amp;rsquo;ll be using shortly. Things like system specs and storage
+are obviously somewhat up to you to decide on, but I went with fairly muscular &amp;lsquo;m4.xlarge&amp;rsquo; instances that had 250 GB of
+storage each (more than big enough for my Reddit submission corpus test data, which was featured in &lt;a href=&#34;http://www.dremio.com/blog/old-and-busted-teasing-formerly-fashionable-websites-from-reddit-data/&#34;&gt;this previous
+article&lt;/a&gt;).&lt;/p&gt;
+
+&lt;h2 id=&#34;step-2-install-cdh-with-cloudera-manager&#34;&gt;Step 2.) Install CDH with Cloudera Manager&lt;/h2&gt;
+
+&lt;p&gt;We&amp;rsquo;ll perform the install of CDH (and thus, our HDFS store) by using Cloudera&amp;rsquo;s awesome Cloudera Manager software, which
+is &lt;a href=&#34;http://www.cloudera.com/downloads/manager/5-5-1.html&#34;&gt;available here&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;After you download the .bin file from this site to one of the nodes on your cluster, mark it as executable and run it
+(from here on out I&amp;rsquo;ll call the node that you selected for this step the &amp;lsquo;Main Node&amp;rsquo;).&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ chmod +x cloudera-manager-installer.bin
+$ sudo ./cloudera-manager-installer.bin
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Once this software finishes running you can point a browser to the Main Node&amp;rsquo;s URL (available from the AWS EC2 web
+interface) on port 7180. From here you can complete the install of CDH to rest of your cluster (the initial username and
+password are both &amp;lsquo;admin&amp;rsquo;). There are various options that show up as you progress through the steps, but for this
+simple example it&amp;rsquo;s sufficient to accept the defaults for most cases. Just be sure to check the &amp;ldquo;Install Oracle Java SE
+Development Kit&amp;rdquo; and &amp;ldquo;Install Java Unlimited Strength Encryption Policy Files&amp;rdquo; boxes when they show up (this last one
+can be relevant to Kerberos encryption). You&amp;rsquo;ll also need to specify the user &amp;lsquo;ubuntu&amp;rsquo; and the relevant private key
+&amp;lsquo;.pem&amp;rsquo; file for your cluster when you hit the &amp;ldquo;Provide SSH login credentials&amp;rdquo; screen. And the basic &amp;ldquo;Core Hadoop&amp;rdquo; option
+is fine when t comes to choosing what package set to install.&lt;/p&gt;
+
+&lt;p&gt;That&amp;rsquo;s really all there is to getting the Hadoop side of things running for this project. Shockingly easy, right?&lt;/p&gt;
+
+&lt;p&gt;But now it&amp;rsquo;s time for Kerberos. Sigh.&lt;/p&gt;
+
+&lt;h2 id=&#34;step-3a-install-and-configure-kerberos-main-node&#34;&gt;Step 3a.) Install and Configure Kerberos: Main Node&lt;/h2&gt;
+
+&lt;p&gt;Okay, it&amp;rsquo;s not actually all that bad. All we have to do is install some packages on the cluster and do some small edits
+to conf files before we can hand it off to the Clouder Manager wizard for Kerberos configuration (let me say it again:
+Cloudera Manager is awesome).&lt;/p&gt;
+
+&lt;p&gt;Let&amp;rsquo;s begin with that needs to be done on the Main Node, which in the parlance of Kerberos will become the &amp;lsquo;KDC&amp;rsquo; (Key
+Distribution Center) of our authentication system. As per this &lt;a href=&#34;https://help.ubuntu.com/community/Kerberos&#34;&gt;Ubuntu
+documentation&lt;/a&gt; (which was a useful reference for many of the following
+steps), go ahead and install these two packages&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ sudo apt-get install krb5-kdc krb5-admin-server
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;entering &amp;ldquo;KEBEROS.CDH&amp;rdquo; for the realm name in the first field that pops up, and specifying the Main Node&amp;rsquo;s internal DNS
+name in the next two (again these can be found on the AWS EC2 instance page&amp;mdash;they&amp;rsquo;re formatted like
+&amp;ldquo;ip-172.XXX.XXX.XXX.us-west-2.compute.internal&amp;rdquo;). Then run&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ sudo dpkg-reconfigure krb5-kdc
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;and select &amp;ldquo;Yes.&amp;rdquo;&lt;/p&gt;
+
+&lt;p&gt;Now it&amp;rsquo;s time to edit the &lt;code&gt;/etc/krb5kdc/kdc.conf&lt;/code&gt; file as recommended in &lt;a href=&#34;http://www.cloudera.com/documentation/enterprise/latest/topics/cm_sg_s4_kerb_wizard.html&#34;&gt;these Cloudera
+instructions&lt;/a&gt;. Place the
+lines&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;max_life = 1d
+max_renewable_life = 7d
+kdc_tcp_ports = 88
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;in the KERBEROS.CDH &amp;lsquo;[realms]&amp;rsquo; entry, replacing any similar lines and deleting &amp;lsquo;kdc_ports&amp;rsquo; both there underneath
+&amp;lsquo;[kdcdefaults].&amp;rsquo; Alright! On to the next file.&lt;/p&gt;
+
+&lt;p&gt;Create (or open) &lt;code&gt;/etc/krb5kdc/kadm5.acl&lt;/code&gt;, and insert this line:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;*/admin@KERBEROS.CDH    *
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now it&amp;rsquo;s time to initialize the Kerberos realm with:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ sudo krb5_newrealm
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Cool. Now, we need to create the credentials that the Cloudera Manager wizard will use when it completes our Kerberos
+setup. To do this enter the command&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ sudo kadmin.local
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;and from within the prompt that&amp;rsquo;s presented, type:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;addprinc -pw &amp;lt;PASSWORD&amp;gt; cloudera-scm/admin@KERBEROS.CDH
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now hit Crtl-D to exit the prompt, and install one last package:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ sudo apt-get install ldap-utils
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;step-3b-install-and-configure-kerberos-other-nodes&#34;&gt;Step 3b.) Install and Configure Kerberos: Other Nodes&lt;/h2&gt;
+
+&lt;p&gt;Compared to the Main Node setup, this step is mercifully brief. For each other note in the cluster you just need to
+install this package:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ sudo apt-get install krb5-user
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;When you&amp;rsquo;re presented with the text fields this time you can just hit enter, because the wizard will end up handling
+this stuff for you in the end.&lt;/p&gt;
+
+&lt;h2 id=&#34;step-4-use-the-cloudera-manager-kerberos-wizard&#34;&gt;Step 4.) Use the Cloudera Manager Kerberos wizard&lt;/h2&gt;
+
+&lt;p&gt;To start the Kerberos wizard, select &amp;ldquo;Enable Kerberos&amp;rdquo; from the dropdown menu for the cluster (see Figure 1).&lt;/p&gt;
+
+&lt;p&gt;&lt;br&gt;
+&lt;p style=&#34;text-align: center;&#34;&gt;
+&lt;img style=&#34;max-width: 100%;&#34; src=&#34;kstirman.github.io/bookshelf/img/cloudera_kerberos.jpg&#34;&gt;
+&lt;/p&gt;
+&lt;p style=&#34;text-align: center; font-style: italic;&#34;&gt;&lt;b&gt;Figure 1&lt;/b&gt;: Starting Cloudera Manager&amp;rsquo;s Kerberos wizard.&lt;/p&gt;
+&lt;br&gt;&lt;/p&gt;
+
+&lt;p&gt;First you&amp;rsquo;re asked to check a bunch of boxes which are friendly reminders of all the prep work you need to do before the
+wizard can take over. We&amp;rsquo;ve done all of this in the previous steps, so you can check away with wild abandon.&lt;/p&gt;
+
+&lt;p&gt;On the next page put the AWS internal address for the Main Node in the field marked &amp;ldquo;KDC Server Host&amp;rdquo; and then
+&amp;ldquo;KERBEROS.CDH&amp;rdquo; for the realm name. Hit &amp;ldquo;Continue&amp;rdquo; and then check the &amp;ldquo;Manage krb5.conf through Cloudera Manager&amp;rdquo; box.
+The defaults here are fine.&lt;/p&gt;
+
+&lt;p&gt;Now you need to enter the credentials that were set up in Step 3a. As per &lt;a href=&#34;http://www.cloudera.com/documentation/enterprise/latest/topics/cm_sg_s3_cm_principal.html&#34;&gt;this Cloudera
+doc&lt;/a&gt; we made the account
+&amp;lsquo;cloudera-scm/admin&amp;rsquo;, so go ahead and put that username and whatever password you chose into this page.&lt;/p&gt;
+
+&lt;p&gt;From here you can just hit &amp;ldquo;Continue&amp;rdquo; until you&amp;rsquo;re presented with a &amp;ldquo;Yes, I am ready to restart the cluster now&amp;rdquo;
+checkbox. Check it, and (you guessed it!) hit &amp;ldquo;Continue&amp;rdquo; again. The wizard will now stop all the services and bring them
+back up with Kerberos authentication activated.&lt;/p&gt;
+
+&lt;p&gt;That&amp;rsquo;s it! You now have a Kerberos-secured CDH cluster!&lt;/p&gt;
+
+&lt;p&gt;This is cool in itself, but in my next post we&amp;rsquo;ll get to the real heart of the matter: Installing and configuring Apache
+Drill on this system so that we can perform the secure SQL queries that I advertized in the article title. Stay tuned!&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Drill plays the classics: Querying musical compositions with SQL</title>
+      <link>/kstirman.github.io/bookshelf/blog/Drill-plays-the-classics-querying-musical-compositions-with-SQL/</link>
+      <pubDate>Thu, 21 Jan 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/Drill-plays-the-classics-querying-musical-compositions-with-SQL/</guid>
+      <description>&lt;p&gt;Today in &amp;lsquo;Wow, I never expected to use SQL for &lt;em&gt;that!&lt;/em&gt;,&amp;rsquo; I&amp;rsquo;m going to show how you can use Drill (along with a simple
+command line utility) to analyze musical compositions for sound and style characteristics.&lt;/p&gt;
+
+&lt;p&gt;The music we&amp;rsquo;ll be analyzing is a selection of piano pieces written by various classical composers. In particular, we&amp;rsquo;ll
+be looking at representations of this music encoded into MIDI files created by one Bernd Krueger, who hosts them on his
+site: www.piano-midi.de. A linchpin of this approach will be the super cool command line utility &lt;code&gt;midicsv&lt;/code&gt; (&lt;a href=&#34;http://www.fourmilab.ch/webtools/midicsv/&#34;&gt;available
+here&lt;/a&gt;), which translates the events of a MIDI file into text in the form of a
+CSV file.&lt;/p&gt;
+
+&lt;p&gt;After a little prepwork I found myself with a directory called &lt;code&gt;music_csv&lt;/code&gt; which held the CSV-translated MIDI files in
+subdirectories named after each of the composers I had downloaded. As we can see on the midicsv web site, the third
+column of each CSV listing contains the type of event. Two of these that might be of particular interest are &amp;lsquo;Note_on_c&amp;rsquo;
+and &amp;lsquo;Tempo&amp;rsquo;, which respectively begin playing a note and set the current tempo of the piece. For &amp;lsquo;Note_on_c&amp;rsquo; the value
+we&amp;rsquo;ll pay attention to (the note being played) is in column five, while for &amp;lsquo;Tempo&amp;rsquo; we&amp;rsquo;ll (unsurprisingly) be looking at
+tempo values, which for this event type show up in column four.&lt;/p&gt;
+
+&lt;p&gt;In MIDI notes are identified by a number, with &amp;lsquo;60&amp;rsquo; being Middle C, and 59 and 61 being the notes just below and just
+above that location. So first let&amp;rsquo;s examine the &amp;lsquo;average note&amp;rsquo; for each composer&amp;rsquo;s selection. This might be a good
+choice if we&amp;rsquo;re looking for music that sounds somewhat dramatic, due to the presence of more notes from the bottom half
+of the keyboard. A Drill query to my &lt;code&gt;music_csv&lt;/code&gt; directory that gives me each composer&amp;rsquo;s average note looks like:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;  SELECT dir0 composer, AVG(CAST(TRIM(columns[4]) AS INT)) `average note`
+    FROM dfs.`/path/to/music_csv`
+   WHERE columns[2] LIKE &#39; Note_on_c&#39;
+GROUP BY dir0
+ORDER BY `average note`;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Which yields the following:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;+--------------+---------------------+
+|   composer   |    average note     |
++--------------+---------------------+
+| borodin      | 61.21679561573178   |
+| mendelssohn  | 61.601812135524604  |
+| schumann     | 62.13615485564304   |
+| bach         | 62.41817789291883   |
+| chopin       | 62.59844650639674   |
+| beethoven    | 62.94818578301335   |
+| granados     | 62.998422159887795  |
+| schubert     | 63.03703764725266   |
+| mussorgsky   | 63.205213945135924  |
+| debussy      | 63.73597678916828   |
+| brahms       | 63.85321901437839   |
+| tchaikovsky  | 63.93177966101695   |
+| grieg        | 65.22842035060975   |
+| burgmueller  | 65.4425336466567    |
+| balakirew    | 66.0802039293708    |
+| albeniz      | 66.68735803242735   |
+| mozart       | 67.12492121887229   |
+| liszt        | 67.51094939468125   |
+| haydn        | 67.87497578301583   |
++--------------+---------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;So for moodier music, it looks like Borodin is your best bet.&lt;/p&gt;
+
+&lt;p&gt;Next we&amp;rsquo;ll try a similar query for the average tempo of a composer&amp;rsquo;s selections. This could be useful if you&amp;rsquo;re looking
+for either tranquil or spritely music:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;  SELECT dir0 composer, AVG(CAST(TRIM(columns[3]) AS INT)) `average tempo`
+    FROM dfs.`/Users/ngriffith/Downloads/music_csv`
+   WHERE columns[2] LIKE &#39; Tempo&#39;
+GROUP BY dir0
+ORDER BY `average tempo`;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;With:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;+--------------+---------------------+
+|   composer   |    average tempo    |
++--------------+---------------------+
+| grieg        | 463950.99792665546  |
+| balakirew    | 516662.79188934295  |
+| chopin       | 549635.4575186928   |
+| schubert     | 555130.6943059019   |
+| granados     | 559992.7081807082   |
+| beethoven    | 562109.4496243594   |
+| mussorgsky   | 572826.2225694832   |
+| tchaikovsky  | 582765.8715467677   |
+| burgmueller  | 585393.9650706437   |
+| borodin      | 587289.7334545455   |
+| albeniz      | 588197.7116116117   |
+| liszt        | 591821.5634490239   |
+| debussy      | 599595.9116922494   |
+| haydn        | 606727.8991650156   |
+| schumann     | 620904.3406527168   |
+| mozart       | 634484.8481915854   |
+| bach         | 665263.0298245614   |
+| brahms       | 688238.5542258788   |
+| mendelssohn  | 695130.138571672    |
++--------------+---------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;So start your search for slower music with Grieg, and go to Mendelssohn if you&amp;rsquo;d prefer something faster. (If you&amp;rsquo;re
+curious, the unit used for tempo here is the length of a quarter note in microseconds).&lt;/p&gt;
+
+&lt;p&gt;Note that both of these examples rely on Drill&amp;rsquo;s ability to query entire directories (and subdirectories!) of files at once.
+And I&amp;rsquo;ve also used the &lt;code&gt;dir0&lt;/code&gt; variable to my advantage in order to provide the name of the composer from my folder
+hierarchy.&lt;/p&gt;
+
+&lt;p&gt;Querying classical music compositions is definitely an unexpected and wonderful way to use Drill!&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Using a SQL JOIN on two CSV files</title>
+      <link>/kstirman.github.io/bookshelf/blog/using-a-SQL-join-on-two-CSV-files/</link>
+      <pubDate>Tue, 19 Jan 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/using-a-SQL-join-on-two-CSV-files/</guid>
+      <description>&lt;p&gt;One of Drill&amp;rsquo;s great strengths is its ability to unite sets of information found in different places. In today&amp;rsquo;s article
+I&amp;rsquo;ll provide a quick example of this functionality by showing you how to you use Drill to quickly improve the interface
+to some found data.&lt;/p&gt;
+
+&lt;p&gt;We&amp;rsquo;ll start with the interesting but strangely formatted business-centered census data that we used in the &lt;a href=&#34;http://www.dremio.com/blog/converting-csv-file-data-to-kudu-storage/&#34;&gt;last
+post&lt;/a&gt; (available on
+&lt;a href=&#34;https://www.census.gov/econ/cbp/download/&#34;&gt;this site&lt;/a&gt; as a 14.3 MB zip file). As you&amp;rsquo;ll recall, our command to query
+the state, county, and industry codes, along with the number of establishments, yielded results in the following format:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;+-----------+----------+---------+------+
+| fipstate  | fipscty  |  naics  | est  |
++-----------+----------+---------+------+
+| 55        | 107      | 321113  | 1    |
+| 48        | 185      | 51213/  | 1    |
+| 39        | 135      | 42491/  | 6    |
+| 04        | 027      | 4411//  | 30   |
+| 08        | 085      | 541870  | 1    |
+| 26        | 061      | 51----  | 17   |
+| 28        | 049      | 519///  | 3    |
+| 48        | 139      | 48849/  | 3    |
+| 22        | 073      | 4853//  | 3    |
+| 48        | 139      | 424910  | 10   |
++-----------+----------+---------+------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;It&amp;rsquo;s great to have data with this level of granularity, but the FIPS codes that the file uses to identify the state and
+county are far from intuitive. Thankfully we can use Drill in combination with this &lt;a href=&#34;https://github.com/hadley/data-counties/blob/master/county-fips.csv&#34;&gt;lovely CSV
+file&lt;/a&gt; from Github user &amp;lsquo;hadley&amp;rsquo; to make the data
+more user-friendly. (Remember to rename both files as &amp;lsquo;.csvh&amp;rsquo; so Drill knows to pick up the column names!)&lt;/p&gt;
+
+&lt;p&gt;Because Drill effectively treats each file as a separate table, we can gain access to human readable state and county
+names by performing an SQL JOIN across the files.&lt;/p&gt;
+
+&lt;p&gt;That handy file from Github has a format like&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;+-----------------------+--------+--------------+-------------+
+|        county         | state  | county_fips  | state_fips  |
++-----------------------+--------+--------------+-------------+
+| Aleutians East        | AK     | 13           | 2           |
+| Aleutians West        | AK     | 16           | 2           |
+| Anchorage             | AK     | 20           | 2           |
+| Bethel                | AK     | 50           | 2           |
+| Bristol Bay           | AK     | 60           | 2           |
+| Denali                | AK     | 68           | 2           |
+| Dillingham            | AK     | 70           | 2           |
+| Fairbanks North Star  | AK     | 90           | 2           |
+| Haines                | AK     | 100          | 2           |
+| Juneau                | AK     | 110          | 2           |
++-----------------------+--------+--------------+-------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;so a simple query that brings state and county names to the census data using a JOIN is:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;  SELECT t2.state, t2.county, SUM(CAST(t1.est AS INT)) `total establishments`
+    FROM dfs.`/path/to/cbp13co.csvh` t1
+    JOIN dfs.`/path/to/county-fips.csvh` t2
+      ON t1.fipstate = t2.state_fips
+     AND t1.fipscty = t2.county_fips
+GROUP BY t2.state, t2.county
+ORDER BY `total establishments`
+    DESC LIMIT 10;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Which, for the curious, produces the following output:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;+--------+--------------+-----------------------+
+| state  |    county    | total establishments  |
++--------+--------------+-----------------------+
+| TX     | Harris       | 571756                |
+| TX     | Dallas       | 374670                |
+| NY     | Suffolk      | 291970                |
+| TX     | Tarrant      | 232484                |
+| MI     | Oakland      | 230154                |
+| GA     | Fulton       | 203028                |
+| MI     | Wayne        | 190806                |
+| NY     | Westchester  | 189820                |
+| TX     | Travis       | 186236                |
+| MO     | St. Louis    | 184326                |
++--------+--------------+-----------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Cool! (And, no, I have no idea why Harris county, Texas is apparently the business capitol of the United States.)&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>SQL on Kudu quickstart</title>
+      <link>/kstirman.github.io/bookshelf/blog/SQL-on-Kudu-quickstart/</link>
+      <pubDate>Wed, 13 Jan 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/SQL-on-Kudu-quickstart/</guid>
+      <description>&lt;p&gt;&lt;a href=&#34;http://getkudu.io/&#34;&gt;Kudu&lt;/a&gt; is a new (currently in beta) distributed data storage system that attempts to unify the
+strengths of HBase and HDFS systems. Although initially developed at Cloudera, the software has recently been inducted
+into the Apache Incubator program. This means there&amp;rsquo;s a reasonable expectation of Kudu becoming the next big Next Big
+Thing in terms of data storage.&lt;/p&gt;
+
+&lt;p&gt;As the widely varied topics of this blog demonstrate, Drill devs aren&amp;rsquo;t very willing to let a potential source of
+valuable data slip by unnoticed, so of course they&amp;rsquo;ve been hard at work on a new storage plugin. Starting in Drill 1.5
+(due out January 2016), performing SQL queries on a Kudu system will be as easy as:&lt;/p&gt;
+
+&lt;p&gt;1.) &lt;a href=&#34;https://drill.apache.org/docs/installing-drill-on-linux-and-mac-os-x/&#34;&gt;Installing Drill&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;2.) Starting the &lt;code&gt;drill-embedded&lt;/code&gt; binary&lt;/p&gt;
+
+&lt;p&gt;3.) Opening the Drill Web Console (&lt;a href=&#34;http://localhost:8047&#34;&gt;http://localhost:8047&lt;/a&gt;)&lt;/p&gt;
+
+&lt;p&gt;4.) Navigating to &amp;lsquo;Storage&amp;rsquo; and creating a new &amp;lsquo;kudu&amp;rsquo; plugin that contains this configuration:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;{
+  &amp;quot;type&amp;quot;: &amp;quot;kudu&amp;quot;,
+  &amp;quot;enabled&amp;quot;: true,
+  &amp;quot;masterAddresses&amp;quot;: &amp;quot;&amp;lt;kudu_master_server_ip_address_1&amp;gt;,&amp;lt;kudu_master_server_ip_address_2&amp;gt;,&amp;lt;etc&amp;gt;&amp;quot;
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;5.) Enabling the storage plugin&lt;/p&gt;
+
+&lt;p&gt;You should now see &amp;lsquo;kudu&amp;rsquo; show up after running a &lt;code&gt;show databases;&lt;/code&gt; command within Drill.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Old and busted: Teasing formerly-fashionable websites from Reddit data</title>
+      <link>/kstirman.github.io/bookshelf/blog/old-and-busted-tesasing-formery-fashionable-websites-from-Reddit-data/</link>
+      <pubDate>Sun, 03 Jan 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/old-and-busted-tesasing-formery-fashionable-websites-from-Reddit-data/</guid>
+      <description>&lt;p&gt;Anyone who spends even a little bit of time on the Internet knows how fickle and volatile the cultural scene is. And
+there&amp;rsquo;s perhaps no greater exemplar of this volatility than Reddit. For good or bad, Reddit communities often serve as
+tastemakers for the Internet at large. If your content is visible on Reddit, chances are that things are going great for
+you. And if not, well, maybe not&amp;hellip;&lt;/p&gt;
+
+&lt;p&gt;The topic for today&amp;rsquo;s post is pretty simple&amp;mdash;I&amp;rsquo;m just going to show off a cool analysis related to this
+observation. The data set will be a &lt;a href=&#34;https://www.reddit.com/r/datasets/comments/3mg812/full_reddit_submission_corpus_now_available_2006/&#34;&gt;JSON dump of all Reddit
+submissions&lt;/a&gt; from
+2006 up through Summer 2015, which I&amp;rsquo;ll be analyzing for site URLs that &lt;em&gt;used&lt;/em&gt; to be popular but have recently fallen
+out of favor. The size of this dump was fairly formidable (about a quarter-terabyte uncompressed), so on the backend
+this analysis was facilitated by running Drill in a cluster configuration on a Hadoop filesystem. This kept the runtime
+of the somewhat sophisticated query I needed to perform down to well under an hour.&lt;/p&gt;
+
+&lt;p&gt;So how exactly does one go about determining which Reddit submission URLs are, technically speaking, &amp;ldquo;old and busted&amp;rdquo;?
+Well, I started off my analysis by constructing a view to keep track of the relevant parameters and convert them to the
+correct format and units. In my case I&amp;rsquo;m interested the number of times a URL shows up in a submission, the average
+posting date for each URL, and the standard deviation in submission dates (in units of days):&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW reddit AS SELECT domain, COUNT(domain) counts, TO_TIMESTAMP(avg(CAST(created_utc AS FLOAT))) avg_date, STDDEV(CAST(created_utc AS FLOAT))/86400 std_dev_days
+       FROM hdfs.`/data/RS_full_corpus.json`
+   GROUP BY domain;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;So now it becomes fairly easy to construct a query on top of this view that looks for websites with old average
+submission dates that also exhibit fairly strongly clustering (which I&amp;rsquo;ll define as an average submission date older
+than Jan. 1, 2011 with a standard deviation in submission dates of less than 600 days). These two in combination will
+define our &amp;ldquo;old and busted&amp;rdquo; criterion.&lt;/p&gt;
+
+&lt;p&gt;The query looks like this, and returns these results:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT * FROM reddit WHERE std_dev_days &amp;lt; 600 AND avg_date &amp;lt; &#39;2011-01-01 00:00:00&#39; ORDER BY counts DESC LIMIT 20;
++------------------------+---------+--------------------------+---------------------+
+|         domain         | counts  |         avg_date         |    std_dev_days     |
++------------------------+---------+--------------------------+---------------------+
+| self.reddit.com        | 647870  | 2010-09-02 13:56:28.448  | 301.71035168793304  |
+| examiner.com           | 151810  | 2010-12-16 23:26:30.526  | 585.7963478654447   |
+| news.bbc.co.uk         | 88227   | 2009-10-19 22:09:54.047  | 499.8828691832385   |
+| squidoo.com            | 68613   | 2010-02-15 05:45:45.863  | 457.7467960677672   |
+| hubpages.com           | 57290   | 2010-01-30 02:18:28.314  | 353.1463760830986   |
+| msnbc.msn.com          | 43643   | 2010-06-13 13:34:33.274  | 491.4442681051865   |
+| associatedcontent.com  | 24146   | 2009-08-18 17:40:57.408  | 403.1500022424656   |
+| tinyurl.com            | 24070   | 2010-08-28 15:11:38.083  | 471.1292710623187   |
+| self.programming       | 20689   | 2009-11-08 14:04:07.185  | 239.53706245104482  |
+| physorg.com            | 17431   | 2010-09-27 02:00:58.908  | 435.832257804899    |
+| ehow.com               | 16228   | 2009-09-19 05:58:19.334  | 524.9960557567199   |
+| gather.com             | 15387   | 2010-06-28 12:05:28.479  | 365.76299060306405  |
+| english.aljazeera.net  | 14573   | 2010-10-02 14:05:55.813  | 360.5432415872375   |
+| subimg.net             | 13459   | 2010-09-29 09:48:42.801  | 278.7920245425415   |
+| helium.com             | 13337   | 2009-09-28 16:38:56.651  | 441.641404727207    |
+| sports.espn.go.com     | 12416   | 2010-10-17 19:30:23.67   | 493.84151020454976  |
+| rapidsharelist.net     | 12128   | 2010-04-26 15:53:44.063  | 14.947036935681274  |
+| waronyou.com           | 12036   | 2009-04-13 17:51:18.434  | 184.16688348655214  |
+| timesonline.co.uk      | 11100   | 2009-05-09 01:23:30.756  | 288.42826940864705  |
+| open.salon.com         | 10727   | 2010-08-10 09:48:09.563  | 494.63567877466306  |
++------------------------+---------+--------------------------+---------------------+
+20 rows selected (2490.628 seconds)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Using this list as a starting point, I started to do a little digging (see Table 1) into why these sites are no longer
+popular. What I found is that there a lot of reasons a site may end up in this ignominious category&amp;mdash;anything from
+a shift in the Google search algorithm to a simple redirect to a new URL. Other explanations included acquisition, a
+collapsed business model, and an outright ban of the URL from Reddit by site administrators.&lt;/p&gt;
+
+&lt;p&gt;&lt;br&gt;
+&lt;p style=&#34;text-align: center;&#34;&gt;
+&lt;img style=&#34;max-width: 80%;&#34; src=&#34;kstirman.github.io/bookshelf/img/reddit_url_table.png&#34;&gt;
+&lt;/p&gt;
+&lt;p style=&#34;text-align: center; font-style: italic;&#34;&gt;&lt;b&gt;Table 1&lt;/b&gt;: A selection of formerly-fashionable websites
+submitted to Reddit, and the suspected reason for their fall from grace.&lt;/p&gt;
+&lt;br&gt;&lt;/p&gt;
+
+&lt;p&gt;This is pretty interesting stuff, right? I&amp;rsquo;m definitely looking forward to using Drill to hunt for even more trends in
+the Reddit submission data.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

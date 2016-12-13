@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Predicting International Space Station solar transits using built-in SQL math functions</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Predicting International Space Station solar transits using built-in SQL math functions</h1>
+          <h4>by Nathan Griffith on 2015-12-21</h4>
+          <script type="text/javascript"
+ src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+<p>If you&rsquo;re an astronomy or spaceflight nerd (in my case: &lsquo;check&rsquo; and check&rsquo;) there&rsquo;s a good chance you&rsquo;ve seen one of
+these really cool photos people have been taking lately where they capture an image of the International Space Station
+as it makes a transit through the disc of the Sun. Here&rsquo;s one that was recently (September &lsquo;15) featured on NASA&rsquo;s
+popular <a href="http://apod.nasa.gov/apod/astropix.html">Astronomy Picture of the Day</a> site:</p>
+
+<p><br>
+<br>
+<p style="text-align: center;">
+<img style="max-width: 100%;" src="/img/iss_sun_trans.jpg">
+</p>
+<p style="text-align: center; font-style: italic;">Two solar transits of the ISS. Image by <a href="https://www.flickr.com/photos/astrohardy/">Hartwig Luethen</a>
+via <a href="http://apod.nasa.gov/apod/ap150912.html">APOD</a>.</p>
+<br>
+<br></p>
+
+<p>For today&rsquo;s demo, I&rsquo;d like to show how we can use the geographic location where these photos were taken, along with some
+NASA data and Apache Drill, to predict the times at which these ISS transits were captured.</p>
+
+<p>To begin with we&rsquo;ll need the ephemerides for the ISS and the Sun. The &lsquo;ephemeris&rsquo; (singular of ephemerides) is basically
+a timetable that gives astronomical data about an object. (NASA has a great <a href="http://ssd.jpl.nasa.gov/horizons.cgi">web-based
+tool</a> for grabbing this information). In our case we&rsquo;ll want the ground-based
+azimuth and elevation angles for a location in Schmalenbeck, Germany (where the photos were taken). Also be sure to
+indicate that you want them exported in &lsquo;csv&rsquo; format at the maximum 1-minute resolution, and for the whole month of
+August 2015 (when the photo was taken).</p>
+
+<p>Once the files are downloaded we have to clean them up slightly before we feed them into Drill. First we&rsquo;ll change the
+way new lines are indicated in the files with these unix commands:</p>
+
+<pre><code>$ tr '\r' '\n' &lt; iss_horizons_results.txt &gt; iss_ephemeris.csv
+$ tr '\r' '\n' &lt; sun_horizons_results.txt &gt; sun_ephemeris.csv
+</code></pre>
+
+<p>Then we&rsquo;ll need to open the them up in a text editor in order to delete some non-tabulated text information at the
+beginning and end of the files. But that&rsquo;s it in terms of data preparation!</p>
+
+<p>Of course the elephant in the room at this point is that I can&rsquo;t attempt this calculation without at least briefly
+turning my attention to some Slightly Scary Vector Math. I&rsquo;ll spare you the grisly details, but it turns out that the
+equation you want for the angular separation between two objects is:</p>
+
+<p>$$ \psi = \cos^{-1}( \cos \phi_1  \cos \theta_1 \cos \phi_2  \cos \theta_2 + \sin \phi_1 \cos \theta_1 \sin \phi_2 \cos
+\theta_2 + \sin \theta_1 \sin \theta_2) $$</p>
+
+<p>where \((\phi_1,\theta_1\)) are the azimuth and elevation angles for the first object (say, the ISS), and
+\((\phi_2,\theta_2\)) are the same angles for the second one (the Sun).</p>
+
+<p>To proceed with this analysis, we&rsquo;re going to push the ephemeris information through a series of views, which can be
+thought of as &lsquo;shortcuts&rsquo; to data structures. After running <code>USE dfs.tmp;</code> to switch to a temporary writable workspace,
+we&rsquo;ll begin by creating the following <code>iss_rad</code> and <code>sun_raw</code> views to hold timestamps and angles (in radians!):</p>
+
+<pre><code>CREATE VIEW iss_rad AS
+     SELECT LTRIM(columns[0],' ') utc_date, RADIANS(CAST(columns[3] AS FLOAT)) azi, RADIANS(CAST(columns[4] AS FLOAT)) ele
+       FROM dfs.`/path/to/iss_ephemeris.csv`;
+</code></pre>
+
+<pre><code>CREATE VIEW sun_rad AS
+     SELECT LTRIM(columns[0],' ') utc_date, RADIANS(CAST(columns[3] AS FLOAT)) azi, RADIANS(CAST(columns[4] AS FLOAT)) ele
+      FROM  dfs.`/path/to/sun_ephemeris.csv`;
+</code></pre>
+
+<p>Next we&rsquo;ll make <code>angle</code>, which is a <code>JOIN</code> between these two views. This will hold all the angular data in one place:</p>
+
+<pre><code>CREATE VIEW angles AS
+     SELECT iss_rad.utc_date, iss_rad.azi azi_iss, iss_rad.ele ele_iss, sun_rad.azi azi_sun, sun_rad.ele ele_sun
+       FROM iss_rad
+       JOIN sun_rad
+         ON iss_rad.utc_date=sun_rad.utc_date;
+</code></pre>
+
+<p>Now it&rsquo;s time to process all of these angles through the built-in <code>SIN</code> and <code>COS</code> functions as we compose the <code>trig</code> view:</p>
+
+<pre><code>CREATE VIEW trig AS
+     SELECT utc_date, COS(azi_iss) cai, SIN(azi_iss) sai, COS(ele_iss) cei, SIN(ele_iss) sei, COS(azi_sun) cas, SIN(azi_sun) sas, COS(ele_sun) ces, SIN(ele_sun) ses
+       FROM angles;
+</code></pre>
+
+<p>Finally we&rsquo;re ready to apply the angular separation equation, and create a view to hold that value (in degrees) for each
+timestamp in our data set:</p>
+
+<pre><code>CREATE VIEW angular_separation AS
+     SELECT utc_date, DEGREES(ACOS(cai*cei*cas*ces + sai*cei*sas*ces + sei*ses)) separation
+       FROM trig;
+</code></pre>
+
+<p>At this point all that&rsquo;s left to do is sort by this separation and see what comes back. For the month of August 2015 in
+Schmalenbeck, Germany, we get the following smallest separation angles between the ISS and the Sun:</p>
+
+<pre><code>&gt; SELECT utc_date, separation FROM angular_separation ORDER BY separation LIMIT 15;
++--------------------+---------------------+
+|      utc_date      |     separation      |
++--------------------+---------------------+
+| 2015-Aug-22 14:16  | 0.5936624801482439  |
+| 2015-Aug-21 15:09  | 1.2274954880124447  |
+| 2015-Aug-24 15:41  | 3.667367759874681   |
+| 2015-Aug-20 16:02  | 4.103746138764579   |
+| 2015-Aug-21 16:44  | 4.437939855015551   |
+| 2015-Aug-19 16:54  | 4.970480616196848   |
+| 2015-Aug-27 11:26  | 5.584842825521101   |
+| 2015-Aug-30 10:22  | 5.8633162688672025  |
+| 2015-Aug-23 13:23  | 7.210373878208339   |
+| 2015-Aug-23 16:33  | 7.526240691540221   |
+| 2015-Aug-30 22:46  | 7.530002688976559   |
+| 2015-Aug-20 17:35  | 7.531388238891503   |
+| 2015-Aug-22 17:25  | 7.56500067197781    |
+| 2015-Aug-20 17:36  | 7.820341221305291   |
+| 2015-Aug-22 15:51  | 7.863051641188923   |
++--------------------+---------------------+
+15 rows selected (0.419 seconds)
+</code></pre>
+
+<p>According to APOD, the images in the photograph were captured on August 22. And if you check out this <a href="https://www.flickr.com/photos/astrohardy/20224921153/">supplementary
+image</a> on the photographer&rsquo;s Flickr account, you can see that he
+indicates the transits as occurring at 14:15:58 and 15:51:31 UTC. Both of these times show up in the results of my
+query!</p>
+
+<p>The only drawback to this method is that the ephemeris data should have a higher time resolution. As the APOD text
+points out, the ISS has an angular velocity of about half a degree a second for these transits, which means that the
+&lsquo;minimum&rsquo; angle for a close pass may be misleadingly large, as in the case of the second transit of August 22.</p>
+
+<p>But in any case, Drill worked splendidly in this application! And I&rsquo;m happy to report that my math did, too :)</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

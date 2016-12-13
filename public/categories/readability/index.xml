@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/readability/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/readability/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Smartest and dumbest subreddits as judged by submission title readability</title>
+      <link>/kstirman.github.io/bookshelf/blog/smartest-and-dumbest-subreddits-as-judged-by-submission-title-readibility/</link>
+      <pubDate>Sat, 06 Feb 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/smartest-and-dumbest-subreddits-as-judged-by-submission-title-readibility/</guid>
+      <description>&lt;p&gt;Alright, time to put the readability UDF from &lt;a href=&#34;http://www.dremio.com/blog/querying-for-reading-level-with-a-simple-udf/&#34;&gt;my last
+post&lt;/a&gt; to work on some data! For today&amp;rsquo;s
+analysis, I&amp;rsquo;ll once again use this &lt;a href=&#34;https://www.reddit.com/r/datasets/comments/3mg812/full_reddit_submission_corpus_now_available_2006/&#34;&gt;Reddit submission
+corpus&lt;/a&gt;, which
+contains submission data from from the years 2006-2015.&lt;/p&gt;
+
+&lt;p&gt;The questions that motivate today&amp;rsquo;s analysis are simple, but fun: Which popular subreddits have the highest average
+submission title reading level? Which ones have the lowest? Or, more glibly, &amp;ldquo;Which subreddits are smart, and which are
+dumb?&amp;rdquo; My custom &lt;code&gt;READABILITY()&lt;/code&gt; function for Drill will help us settle this.&lt;/p&gt;
+
+&lt;p&gt;As usual when performing a slightly sophisticated analysis, I first shuffle the data through some VIEWs in order to
+grapple with it on my terms. In this case the prep work consisted of two VIEWs, which were constructed as follows:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW reddit_readability AS
+     SELECT title, READABILITY(title) ARI, subreddit
+       FROM hdfs.`/data/RS_full_corpus.json`
+      WHERE over_18 = &#39;false&#39;;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;which is in turn fed into:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW reddit AS
+     SELECT subreddit, COUNT(title) posts, AVG(ARI) `avg ARI`
+       FROM reddit_readability
+      GROUP BY subreddit;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;From here the query to ask for &amp;lsquo;smart&amp;rsquo; subreddits (as I&amp;rsquo;ve defined them) is easy:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT subreddit, posts, `avg ARI` FROM reddit WHERE posts &amp;gt; 100000 ORDER BY `avg ARI` DESC LIMIT 10;
++------------------------+---------+---------------------+
+|       subreddit        |  posts  |       avg ARI       |
++------------------------+---------+---------------------+
+| spam                   | 287305  | 15.658034632014635  |
+| longtail               | 134202  | 15.38567146310872   |
+| ModerationLog          | 356311  | 12.622485326455028  |
+| modlog                 | 266188  | 12.477493297559754  |
+| RisingThreads          | 142485  | 11.752936255500762  |
+| worldpolitics          | 163290  | 11.633828401867433  |
+| WritingPrompts         | 150776  | 11.348865875111446  |
+| environment            | 185858  | 11.167274719418218  |
+| Random_Acts_Of_Amazon  | 184420  | 11.14375363175314   |
+| conspiro               | 179705  | 10.868244970017907  |
++------------------------+---------+---------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;These results aren&amp;rsquo;t too surprising. Once the internal Reddit stuff is out of the way you&amp;rsquo;re left with some subjects
+that are pretty stereotypically high-minded: global politics, literary pursuits, and environmental issues. Also
+conspiracy theories, for some reason. That one&amp;rsquo;s weird.&lt;/p&gt;
+
+&lt;p&gt;Alright! On to the dumb stuff!&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT subreddit, posts, `avg ARI` FROM reddit WHERE posts &amp;gt; 100000 ORDER BY `avg ARI` LIMIT 10;
++-----------------------+----------+---------------------+
+|       subreddit       |  posts   |       avg ARI       |
++-----------------------+----------+---------------------+
+| me_irl                | 132477   | -6.597215524826628  |
+| itookapicture         | 226074   | 2.591935687626967   |
+| Fireteams             | 1600719  | 3.1183569978499373  |
+| amiugly               | 108643   | 3.135287171164027   |
+| Kikpals               | 170943   | 3.3521135496701313  |
+| offmychest            | 242639   | 3.794396824263522   |
+| Jokes                 | 163818   | 4.192728884240217   |
+| 4chan                 | 107196   | 4.337776062292176   |
+| GlobalOffensiveTrade  | 823488   | 4.346750167026149   |
+| reactiongifs          | 279156   | 4.464272224403798   |
++-----------------------+----------+---------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Yup. I can see why these subreddits are dumb. They might not be &lt;em&gt;bad&lt;/em&gt;, but they&amp;rsquo;re definitely not exactly intellectual. Instead it looks like they focus on funny stuff (jokes, Internet memes, gifs) and personal vanity.&lt;/p&gt;
+
+&lt;p&gt;I&amp;rsquo;d like to close on a more technical note that may help those of you looking to perform similar analyses: If you want
+to use a Drill UDF in a cluster setting, as I did here (a six-node HDFS configuration, for those curious) be sure to
+copy the relevant .jar files to the &lt;code&gt;jars/3rdparty&lt;/code&gt; directory of each machine&amp;rsquo;s Drill install. That&amp;rsquo;s all the setup required
+to start using the custom functions you&amp;rsquo;ve written on big data right away!&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

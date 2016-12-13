@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/s3a/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/s3a/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>How to query S3 data using Amazon&#39;s S3a library</title>
+      <link>/kstirman.github.io/bookshelf/blog/how-to-query-S3-data-using-Amazons-S3a-library/</link>
+      <pubDate>Mon, 16 Nov 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/how-to-query-S3-data-using-Amazons-S3a-library/</guid>
+      <description>&lt;p&gt;Starting with version 1.3.0, Drill has the ability to query files stored on Amazon&amp;rsquo;s S3 cloud storage using the S3a
+library. This is important, because S3a adds support for files bigger than 5 gigabytes (these were unsupported using
+Drill&amp;rsquo;s previous S3n interface).&lt;/p&gt;
+
+&lt;p&gt;To enable Drill&amp;rsquo;s S3a support, first edit the file &lt;code&gt;conf/core-site.xml&lt;/code&gt; in your Drill install directory, replacing
+the text ENTER_YOUR_ACESSKEY and ENTER_YOUR_SECRETKEY with your AWS credentials.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-xml&#34;&gt;&amp;lt;configuration&amp;gt;
+
+  &amp;lt;property&amp;gt;
+    &amp;lt;name&amp;gt;fs.s3a.access.key&amp;lt;/name&amp;gt;
+    &amp;lt;value&amp;gt;ENTER_YOUR_ACCESSKEY&amp;lt;/value&amp;gt;
+  &amp;lt;/property&amp;gt;
+
+  &amp;lt;property&amp;gt;
+    &amp;lt;name&amp;gt;fs.s3a.secret.key&amp;lt;/name&amp;gt;
+    &amp;lt;value&amp;gt;ENTER_YOUR_SECRETKEY&amp;lt;/value&amp;gt;
+  &amp;lt;/property&amp;gt;
+
+&amp;lt;/configuration&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Next you&amp;rsquo;ll need to duplicate the &amp;lsquo;dfs&amp;rsquo; plugin in the &amp;lsquo;Storage&amp;rsquo; section of the Drill Web Console, which is located at
+&lt;code&gt;localhost:8047&lt;/code&gt;. (Note: on a single machine system, you&amp;rsquo;ll need to run &lt;code&gt;drill-embedded&lt;/code&gt; before you can access the web
+console site). To do this, hit &amp;lsquo;Update&amp;rsquo; next to &amp;lsquo;dfs,&amp;rsquo; and then copy the JSON text that appears. Now create a new
+storage plugin on the previous page, and paste in the &amp;lsquo;dfs&amp;rsquo; text, replacing the text &lt;code&gt;file:///&lt;/code&gt; with
+&lt;code&gt;s3a://your.bucketname&lt;/code&gt;. It doesn&amp;rsquo;t matter what you named your new plugin, but it might be helpful to reference the s3
+and/or the bucket name so you remember what it&amp;rsquo;s for.&lt;/p&gt;
+
+&lt;p&gt;And that&amp;rsquo;s it! You should now be able to talk to data stored on S3 using the S3a library.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

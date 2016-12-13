@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Smartest and dumbest subreddits as judged by submission title readability</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Smartest and dumbest subreddits as judged by submission title readability</h1>
+          <h4>by Nathan Griffith on 2016-02-06</h4>
+          <p>Alright, time to put the readability UDF from <a href="http://www.dremio.com/blog/querying-for-reading-level-with-a-simple-udf/">my last
+post</a> to work on some data! For today&rsquo;s
+analysis, I&rsquo;ll once again use this <a href="https://www.reddit.com/r/datasets/comments/3mg812/full_reddit_submission_corpus_now_available_2006/">Reddit submission
+corpus</a>, which
+contains submission data from from the years 2006-2015.</p>
+
+<p>The questions that motivate today&rsquo;s analysis are simple, but fun: Which popular subreddits have the highest average
+submission title reading level? Which ones have the lowest? Or, more glibly, &ldquo;Which subreddits are smart, and which are
+dumb?&rdquo; My custom <code>READABILITY()</code> function for Drill will help us settle this.</p>
+
+<p>As usual when performing a slightly sophisticated analysis, I first shuffle the data through some VIEWs in order to
+grapple with it on my terms. In this case the prep work consisted of two VIEWs, which were constructed as follows:</p>
+
+<pre><code>CREATE VIEW reddit_readability AS
+     SELECT title, READABILITY(title) ARI, subreddit
+       FROM hdfs.`/data/RS_full_corpus.json`
+      WHERE over_18 = 'false';
+</code></pre>
+
+<p>which is in turn fed into:</p>
+
+<pre><code>CREATE VIEW reddit AS
+     SELECT subreddit, COUNT(title) posts, AVG(ARI) `avg ARI`
+       FROM reddit_readability
+      GROUP BY subreddit;
+</code></pre>
+
+<p>From here the query to ask for &lsquo;smart&rsquo; subreddits (as I&rsquo;ve defined them) is easy:</p>
+
+<pre><code>&gt; SELECT subreddit, posts, `avg ARI` FROM reddit WHERE posts &gt; 100000 ORDER BY `avg ARI` DESC LIMIT 10;
++------------------------+---------+---------------------+
+|       subreddit        |  posts  |       avg ARI       |
++------------------------+---------+---------------------+
+| spam                   | 287305  | 15.658034632014635  |
+| longtail               | 134202  | 15.38567146310872   |
+| ModerationLog          | 356311  | 12.622485326455028  |
+| modlog                 | 266188  | 12.477493297559754  |
+| RisingThreads          | 142485  | 11.752936255500762  |
+| worldpolitics          | 163290  | 11.633828401867433  |
+| WritingPrompts         | 150776  | 11.348865875111446  |
+| environment            | 185858  | 11.167274719418218  |
+| Random_Acts_Of_Amazon  | 184420  | 11.14375363175314   |
+| conspiro               | 179705  | 10.868244970017907  |
++------------------------+---------+---------------------+
+</code></pre>
+
+<p>These results aren&rsquo;t too surprising. Once the internal Reddit stuff is out of the way you&rsquo;re left with some subjects
+that are pretty stereotypically high-minded: global politics, literary pursuits, and environmental issues. Also
+conspiracy theories, for some reason. That one&rsquo;s weird.</p>
+
+<p>Alright! On to the dumb stuff!</p>
+
+<pre><code>&gt; SELECT subreddit, posts, `avg ARI` FROM reddit WHERE posts &gt; 100000 ORDER BY `avg ARI` LIMIT 10;
++-----------------------+----------+---------------------+
+|       subreddit       |  posts   |       avg ARI       |
++-----------------------+----------+---------------------+
+| me_irl                | 132477   | -6.597215524826628  |
+| itookapicture         | 226074   | 2.591935687626967   |
+| Fireteams             | 1600719  | 3.1183569978499373  |
+| amiugly               | 108643   | 3.135287171164027   |
+| Kikpals               | 170943   | 3.3521135496701313  |
+| offmychest            | 242639   | 3.794396824263522   |
+| Jokes                 | 163818   | 4.192728884240217   |
+| 4chan                 | 107196   | 4.337776062292176   |
+| GlobalOffensiveTrade  | 823488   | 4.346750167026149   |
+| reactiongifs          | 279156   | 4.464272224403798   |
++-----------------------+----------+---------------------+
+</code></pre>
+
+<p>Yup. I can see why these subreddits are dumb. They might not be <em>bad</em>, but they&rsquo;re definitely not exactly intellectual. Instead it looks like they focus on funny stuff (jokes, Internet memes, gifs) and personal vanity.</p>
+
+<p>I&rsquo;d like to close on a more technical note that may help those of you looking to perform similar analyses: If you want
+to use a Drill UDF in a cluster setting, as I did here (a six-node HDFS configuration, for those curious) be sure to
+copy the relevant .jar files to the <code>jars/3rdparty</code> directory of each machine&rsquo;s Drill install. That&rsquo;s all the setup required
+to start using the custom functions you&rsquo;ve written on big data right away!</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Querying Google Analytics JSON with a custom SQL function</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Querying Google Analytics JSON with a custom SQL function</h1>
+          <h4>by Nathan Griffith on 2015-10-30</h4>
+          <p><a href="/blog/using-sql-to-interface-with-google-analytics-data-stored-on-amazon-s3/">Last time</a> I wrapped up
+by showing you how to look at Google Analytics JSON using a nested SQL query in Apache Drill.  This approach is fine,
+but by implementing a custom function in Drill we can talk to the same data using a much simpler query.</p>
+
+<p>To get started making user defined functions (UDFs), you first need to download and install <a href="https://maven.apache.org/download.cgi">Apache
+Maven</a>. Once you have the tarball, move it to your home directory, and then do:</p>
+
+<pre><code>tar xzvf apache-maven-3.3.3-bin.tar.gz
+mv apache-maven-3.3.3 apache-maven
+</code></pre>
+
+<p>You should also put Maven&rsquo;s <code>bin</code> directory in your system path, so add the line</p>
+
+<pre><code>export PATH=$PATH:~/apache-maven/bin
+</code></pre>
+
+<p>to the end of your <code>.bashrc</code> or <code>.bash_profile</code> file. Next we need to create a new project in Maven for our custom
+function. You can do this by issuing a command like:</p>
+
+<pre><code>mvn archetype:generate -DgroupId=com.yourgroupidentifier.udf -DartifactId=gahelper -DinteractiveMode=false
+</code></pre>
+
+<p>in whatever folder you prefer to store the project. We&rsquo;re going to call our Google Analytics helper function GAHELPER(),
+although you&rsquo;re free to call it whatever you prefer (in fact, FRANK() has a nice ring to it). Now cd to the &lsquo;gahelper&rsquo;
+(or &lsquo;frank&rsquo;!) directory, and open up the configuration file for the project: <code>pom.xml</code>. Add the following new dependecy
+under the <code>&lt;dependencies&gt;</code> XML tag:</p>
+
+<pre><code>&lt;dependency&gt;
+  &lt;groupId&gt;org.apache.drill.exec&lt;/groupId&gt;
+  &lt;artifactId&gt;drill-java-exec&lt;/artifactId&gt;
+  &lt;version&gt;1.2.0&lt;/version&gt;
+&lt;/dependency&gt;
+</code></pre>
+
+<p>Then place this block one level under the main <code>&lt;project&gt;</code> tag:</p>
+
+<pre><code>&lt;build&gt;
+  &lt;plugins&gt;
+    &lt;plugin&gt;
+      &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+      &lt;artifactId&gt;maven-source-plugin&lt;/artifactId&gt;
+      &lt;version&gt;2.4&lt;/version&gt;
+      &lt;executions&gt;
+        &lt;execution&gt;
+          &lt;id&gt;attach-sources&lt;/id&gt;
+          &lt;phase&gt;package&lt;/phase&gt;
+          &lt;goals&gt;
+            &lt;goal&gt;jar-no-fork&lt;/goal&gt;
+          &lt;/goals&gt;
+        &lt;/execution&gt;
+      &lt;/executions&gt;
+    &lt;/plugin&gt;
+  &lt;/plugins&gt;
+&lt;/build&gt;
+</code></pre>
+
+<p>Before we start messing with the actual code of the project, we need to do one last thing so that Drill knows
+to treat what we&rsquo;re making as a function we can use in queries. Make this folder from within the base directory of your
+project (the one that has <code>pom.xml</code> in it):</p>
+
+<pre><code>mkdir ./src/main/resources
+</code></pre>
+
+<p>And then create the file <code>./src/main/resources/drill-module.conf</code>, and fill it with this configuration text:</p>
+
+<pre><code>drill {
+  classpath.scanning {
+    packages : ${?drill.classpath.scanning.packages} [
+      com.yourgroupidentifier.udf
+    ]
+  }
+}
+</code></pre>
+
+<p>Okay: Time to check out some UDF source code! Go to the project&rsquo;s <code>src/main/java/com/yourgroupidentifier/udf</code>
+directory, delete <code>App.java</code>, and create a new file named <code>gaHelper.java</code>. Paste in the following source (note that the
+package name listed here should be the same as the one given in the <code>drill-module.conf</code> file we just made):</p>
+
+<pre><code class="language-java">// This software is covered under the Apache 2.0 license
+// Read here: http://www.apache.org/licenses/LICENSE-2.0
+
+package com.yourgroupidentifier.udf;
+
+import org.apache.drill.exec.expr.DrillSimpleFunc;
+
+import org.apache.drill.exec.expr.annotations.FunctionTemplate;
+import org.apache.drill.exec.expr.annotations.Param;
+import org.apache.drill.exec.expr.annotations.Output;
+
+import org.apache.drill.exec.vector.complex.reader.FieldReader;
+
+import io.netty.buffer.DrillBuf;
+import org.apache.drill.exec.vector.complex.writer.BaseWriter;
+
+import javax.inject.Inject;
+
+@FunctionTemplate(name=&quot;gahelper&quot;, scope=FunctionTemplate.FunctionScope.SIMPLE, nulls=FunctionTemplate.NullHandling.NULL_IF_NULL)
+
+public class gaHelper implements DrillSimpleFunc {
+
+  @Param FieldReader columnsArray;
+  @Param FieldReader rowArray;
+
+  @Output BaseWriter.ComplexWriter outWriter;
+
+  @Inject DrillBuf outBuffer;
+
+  public void setup() {}
+
+  public void eval() {
+
+    org.apache.drill.exec.vector.complex.writer.BaseWriter.MapWriter gaMapWriter = outWriter.rootAsMap();
+
+    // Index used to iterate over the 'rows' entries
+    Integer i = 0;
+
+    // Work through 'columnHeaders' list, lining it up with the fields in a 'rows' entry
+    while(columnsArray.next()) {
+
+      // Pull name and type information about the column
+      String colNameString = columnsArray.reader(&quot;name&quot;).readText().toString();
+      String colTypeString = columnsArray.reader(&quot;dataType&quot;).readText().toString();
+
+      // And the corresponding entry from the 'rows' list
+      String rowString = rowArray.readText(i).toString();
+
+      // Save data to the map according to the type indicated in 'columnHeaders'
+      if (colTypeString.equals(&quot;INTEGER&quot;)) {
+
+        org.apache.drill.exec.expr.holders.IntHolder intHolder = new org.apache.drill.exec.expr.holders.IntHolder();
+
+        intHolder.value = Integer.parseInt(rowString);
+
+        gaMapWriter.integer(colNameString).write(intHolder);
+      }
+      else if (colTypeString.equals(&quot;TIME&quot;) || colTypeString.equals(&quot;FLOAT&quot;) || colTypeString.equals(&quot;PERCENT&quot;) || colTypeString.equals(&quot;CURRENCY&quot;)) {
+
+        org.apache.drill.exec.expr.holders.Float8Holder floatHolder = new org.apache.drill.exec.expr.holders.Float8Holder();
+
+        floatHolder.value = Float.parseFloat(rowString);
+
+        gaMapWriter.float8(colNameString).write(floatHolder);
+      }
+      // If it's not one of these, just treat it as a &quot;STRING&quot;
+      else {
+
+        org.apache.drill.exec.expr.holders.VarCharHolder rowHolder = new org.apache.drill.exec.expr.holders.VarCharHolder();
+
+        byte[] rowStringBytes = rowString.getBytes();
+
+        outBuffer.reallocIfNeeded(rowStringBytes.length);
+        outBuffer.setBytes(0, rowStringBytes);
+
+        rowHolder.start = 0;
+        rowHolder.end = rowStringBytes.length;
+        rowHolder.buffer = outBuffer;
+
+        gaMapWriter.varChar(colNameString).write(rowHolder);
+      }
+
+      i++;
+    }
+  }
+}
+</code></pre>
+
+<p>A more detailed explanation of UDF source code is available in the <a href="https://drill.apache.org/docs/tutorial-develop-a-simple-function/">Drill
+documentation</a>, but here are the basics: The &lsquo;@Param&rsquo;
+annotations indicate variable types for the first and second inputs to the function, and &lsquo;@Output&rsquo; does the same for
+(you guessed it) the output. After we set up a Drill buffer with the &lsquo;@Inject&rsquo; line, &lsquo;@FunctionTemplate()&rsquo; specifies
+some function behavior, including the name we&rsquo;ll use to invoke it from the command line interface. For this UDF we don&rsquo;t
+need to do anything in &lsquo;setup(),&rsquo; but we do need to fill in &lsquo;eval()&rsquo; with code that defines the operation of the
+function.</p>
+
+<p>In the case of GAHELPER(), the function processes the first arugment (the &lsquo;columnHeaders&rsquo; entry of the Google Analytics
+JSON), along with the second argument (the &lsquo;rows&rsquo; entry), to output a map of keys and values for each row of the GA
+data. Along the way it also determines the variable type from &lsquo;columnHeaders&rsquo; so we can, for example, immediately talk
+to integers in the output map like they <em>are</em> integers instead of having to pass them through a CAST() like we did in the
+last article.</p>
+
+<p>Now build the source by running <code>mvn clean package</code> in the directory that contains <code>pom.xml</code>, and then copy the
+resulting files to the Drill install:</p>
+
+<pre><code>cp target/*.jar ~/apache-drill/jars/3rdparty
+</code></pre>
+
+<p>Now launch <code>drill-embedded</code> and give it a try. The output of the function (truncated somewhat by hand) has a structure like:</p>
+
+<pre><code>SELECT GAHELPER(ga_table.columnHeaders,FLATTEN(ga_table.`rows`)) FROM `s3-ga`.`google_analytics_dev_2015-10-19.json`
+ga_table;
++--------+
+| EXPR$0 |
++--------+
+| {&quot;ga:browser&quot;:&quot;Chrome&quot;,&quot;ga:browserVersion&quot;:&quot;39.0.2171.71&quot;,&quot;ga:screenResolution&quot;:&quot;1024x768&quot;,&quot;ga:deviceCategory&quot;:&quot;desktop&quot;,...} |
+| {&quot;ga:browser&quot;:&quot;Chrome&quot;,&quot;ga:browserVersion&quot;:&quot;39.0.2171.71&quot;,&quot;ga:screenResolution&quot;:&quot;1024x768&quot;,&quot;ga:deviceCategory&quot;:&quot;desktop&quot;,...} |
+| {&quot;ga:browser&quot;:&quot;Chrome&quot;,&quot;ga:browserVersion&quot;:&quot;40.0.2214.111&quot;,&quot;ga:screenResolution&quot;:&quot;(not set)&quot;,&quot;ga:deviceCategory&quot;:&quot;desktop&quot;,...} |
+| ... |
+</code></pre>
+
+<p>Now remember that using only standard Drill functions, the query I ended on last time looked like this:</p>
+
+<pre><code class="language-sql">  SELECT `Date`, `Hour`, Browser, Version, Resolution, Device, SUM(CAST(Sessions AS INTEGER)) `Total Sessions`
+    FROM (SELECT data[4] `Date`, data[5] `Hour`, data[0] Browser, data[1] Version, data[2] Resolution, data[3] Device, data[8] Sessions
+            FROM (SELECT FLATTEN(ga_table.`rows`) data
+                    FROM `s3-ga`.`google_analytics_dev_2015-10-19.json` ga_table))
+GROUP BY `Date`, `Hour`, Browser, Version, Resolution, Device
+ORDER BY `Date`, `Hour`;
+</code></pre>
+
+<p>But if we use the awesome power of the GAHELPER() UDF, we can perform the same query with:</p>
+
+<pre><code class="language-sql">  SELECT m.r.`ga:date` `Date`, m.r.`ga:hour` `Hour`, m.r.`ga:browser` Browser, m.r.`ga:browserVersion` Version,
+         m.r.`ga:screenResolution` Resolution, m.r.`ga:deviceCategory` Device, SUM(m.r.`ga:sessions`) `Total Sessions`
+    FROM (SELECT GAHELPER(ga_table.columnHeaders,FLATTEN(ga_table.`rows`)) AS r
+            FROM `s3-ga`.`google_analytics_dev_2015-10-19.json` ga_table) AS m
+GROUP BY m.r.`ga:date`, m.r.`ga:hour`, m.r.`ga:browser`, m.r.`ga:browserVersion`, m.r.`ga:screenResolution`, m.r.`ga:deviceCategory`
+ORDER BY m.r.`ga:date`, m.r.`ga:hour`;
+</code></pre>
+
+<p>Note the advantages here! We only need <em>one</em> subquery now, and we can reference the data directly using intrinsic Google
+Analytics names (&lsquo;ga:browserVersion&rsquo;, etc.). In fact, by eliminating the need to manually determine what each index
+means (&lsquo;4&rsquo; for &lsquo;Date&rsquo;, or &lsquo;0&rsquo; for &lsquo;Browser&rsquo;) we&rsquo;re skipping a whole step that&rsquo;s implicit in the first query. And don&rsquo;t
+forget that now we can call SUM() directly on the sessions count without a preceeding CAST() since GAHELPER() is smart
+enough to determine the types of values.</p>
+
+<p>So that&rsquo;s my whirlwind tour of the custom function capability of Apache Drill. Time to start thinking about how a UDF
+could improve your data experience!</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

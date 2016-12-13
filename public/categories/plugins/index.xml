@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/plugins/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/plugins/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Configuring Drill&#39;s storage plugins with the REST API</title>
+      <link>/kstirman.github.io/bookshelf/blog/configuring-Drills-storage-plugins-with-the-rest-api/</link>
+      <pubDate>Wed, 02 Dec 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/configuring-Drills-storage-plugins-with-the-rest-api/</guid>
+      <description>&lt;p&gt;The Web Console of Apache Drill is an intuitive configuration tool, but it&amp;rsquo;s easy to imagine scenarios where connecting
+to a Drill instance via a browser isn&amp;rsquo;t desirable or even possible (e.g. within a script or in a high security
+environment).&lt;/p&gt;
+
+&lt;p&gt;So if you find yourself needing to set up a Drill storage plugin in such a situation, what should you do? Well, in cases
+like this Drill&amp;rsquo;s built-in REST API comes to the rescue.&lt;/p&gt;
+
+&lt;p&gt;As demonstrated in the following Python script, setting up a new plugin (in this case one for HDFS) is a pretty simple
+operation when performed via the REST interface:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-python&#34;&gt;import httplib
+import json
+
+# Create a connection to the local instance of Drill
+drillRestConn = httplib.HTTPConnection(&amp;quot;localhost:8047&amp;quot;)
+
+# First GET standard &#39;dfs&#39; plugin via REST
+drillRestConn.request(&amp;quot;GET&amp;quot;,&amp;quot;/storage/dfs.json&amp;quot;)
+drillRestResponse = drillRestConn.getresponse()
+storageDict = json.loads(drillRestResponse.read())
+
+# Now modify it into one for HDFS
+storageDict[&amp;quot;name&amp;quot;] = &amp;quot;hdfs&amp;quot;
+storageDict[&amp;quot;config&amp;quot;][&amp;quot;connection&amp;quot;] = &amp;quot;hdfs://&amp;lt;ADDRESS OF HDFS NAMENODE&amp;gt;:8020&amp;quot;
+storageJson = json.dumps(storageDict)
+
+# Then POST it back via REST
+pluginHeader = {&amp;quot;Content-Type&amp;quot;: &amp;quot;application/json&amp;quot;}
+drillRestConn.request(&amp;quot;POST&amp;quot;, &amp;quot;/storage/hdfs.json&amp;quot;, storageJson, pluginHeader)
+drillRestReponse = drillRestConn.getresponse()
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;(This code is based on a portion of the EMR bootstrap script indicated in &lt;a href=&#34;http://www.dremio.com/blog/bootstrapping-an-interactive-sql-environment-on-amazon-emr/&#34;&gt;this
+post&lt;/a&gt;.)&lt;/p&gt;
+
+&lt;p&gt;Notice how the first endpoint I use is labeled by the name of an existing plugin that I&amp;rsquo;d like information about (in
+this case &amp;lsquo;dfs&amp;rsquo; which is the name of the default plugin for the local filesystem). This information is returned in the
+form of a JSON string which starts out like:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;{
+  &amp;quot;name&amp;quot; : &amp;quot;dfs&amp;quot;,
+  &amp;quot;config&amp;quot; : {
+    &amp;quot;type&amp;quot; : &amp;quot;file&amp;quot;,
+    &amp;quot;enabled&amp;quot; : true,
+    &amp;quot;connection&amp;quot; : &amp;quot;file:///&amp;quot;,
+    &amp;quot;workspaces&amp;quot; : {
+      &amp;quot;root&amp;quot; : {
+        &amp;quot;location&amp;quot; : &amp;quot;/&amp;quot;,
+        &amp;quot;writable&amp;quot; : false,
+        &amp;quot;defaultInputFormat&amp;quot; : null
+      },
+      &amp;quot;tmp&amp;quot; : {
+        &amp;quot;location&amp;quot; : &amp;quot;/tmp&amp;quot;,
+        &amp;quot;writable&amp;quot; : true,
+        &amp;quot;defaultInputFormat&amp;quot; : null
+      }
+    },
+    ... etc
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;To change this plugin to reference an HDFS store, all I have to do is edit the JSON so that the &amp;ldquo;name&amp;rdquo; and then the
+&amp;ldquo;connection&amp;rdquo; key (located under &amp;ldquo;config&amp;rdquo;) have appropriate values. Once that&amp;rsquo;s done I can POST the modified
+configuration JSON back to Drill, using the name of the new plugin that I&amp;rsquo;d like to create as the label of the endpoint.&lt;/p&gt;
+
+&lt;p&gt;So if you find yourself browserless and in need of some Drill plugin configuration&amp;mdash;don&amp;rsquo;t despair! You&amp;rsquo;re only a
+couple REST requests away from a console-based solution.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

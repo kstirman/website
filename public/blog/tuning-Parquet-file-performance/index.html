@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Tuning Parquet file performance</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Tuning Parquet file performance</h1>
+          <h4>by Nathan Griffith on 2015-12-13</h4>
+          <p>Today I&rsquo;d like to pursue a brief discussion about how changing the size of a Parquet file&rsquo;s &lsquo;row group&rsquo; to match a file
+system&rsquo;s block size can effect the efficiency of read and write performance. This tweak can be especially important on
+HDFS environments in which I/O is intrinsically tied to network operations. (Note: If you&rsquo;d first like to learn about
+Parquet in a less &lsquo;nuts and bolts&rsquo; manner, let me recommend <a href="http://www.dremio.com/blog/sql-and-parquet-a-simple-demo/">this
+post</a> in which I provide a simple demo of the format using
+Apache Drill).</p>
+
+<p>To understand why the &lsquo;row group&rsquo; size matters, it might be useful to first understand what the heck a &lsquo;row group&rsquo; is.
+For this let&rsquo;s refer to Figure 1, which is a simple illustration of the Parquet file format.</p>
+
+<p><br>
+<br>
+<p style="text-align: center;">
+<img style="max-width: 100%;" src="/img/parquet_block1.png">
+</p>
+<p style="text-align: center; font-style: italic;">Figure 1: The basic anatomy of a Parquet file. The left file contains
+one row group, while the right is comprised of several.</p>
+<br>
+<br></p>
+
+<p>As you can see, a row group is a segment of the Parquet file that holds serialized (and compressed!) arrays of column
+entries. Since bigger row groups mean longer continuous arrays of column data (which is the whole point of Parquet!),
+bigger row groups are generally good news if you want faster Parquet file operations.</p>
+
+<p>But how does the block size of the disk come into play? Let&rsquo;s look at Figure 2, which explores three different Parquet
+storage scenarios for an HDFS file system. In Scenario A, very large Parquet files are stored using large row groups.
+The large row groups are good for executing efficient column-based manipulations, but the groups and files are prone to
+spanning multiple disk blocks, which risks latency by invoking I/O operations. In Scenario B, small files are stored
+using a single small row group. This mitigates the number of block crossings, but reduces the efficacy of Parquet&rsquo;s
+columnar storage format.</p>
+
+<p><br>
+<br>
+<p style="text-align: center;">
+<img style="max-width: 100%;" src="/img/parquet_block2.png">
+</p>
+<p style="text-align: center; font-style: italic;">Figure 2: Three different Parquet storage scenarios for an HDFS file
+system.</p>
+<br>
+<br></p>
+
+<p>An ideal situation is demonstrated in Scenario C, in which one large Parquet file with one large row group is stored in
+one large disk block. This minimizes I/O operations, while maximizing the length of the stored columns. The <a href="https://parquet.apache.org/documentation/latest/">official
+Parquet documentation</a> recommends a disk block/row group/file size of
+512 to 1024 MB on HDFS.</p>
+
+<p>In Apache Drill, you can change the row group size of the Parquet files it writes by using the <code>ALTER SYSTEM SET</code>
+command on the <code>store.parquet.block-size</code> variable. For instance to set a row group size of 1 GB, you would enter:</p>
+
+<pre><code>ALTER SYSTEM SET `store.parquet.block-size` = 1073741824;
+</code></pre>
+
+<p>(Note: larger block sizes will also require more memory to manage.)</p>
+
+<p>Parquet and Drill are already extremely well integrated when it comes to data access and storage&mdash;this tweak just
+enhances an already potent symbiosis!</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/hdfs/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/hdfs/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Old and busted: Teasing formerly-fashionable websites from Reddit data</title>
+      <link>/kstirman.github.io/bookshelf/blog/old-and-busted-tesasing-formery-fashionable-websites-from-Reddit-data/</link>
+      <pubDate>Sun, 03 Jan 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/old-and-busted-tesasing-formery-fashionable-websites-from-Reddit-data/</guid>
+      <description>&lt;p&gt;Anyone who spends even a little bit of time on the Internet knows how fickle and volatile the cultural scene is. And
+there&amp;rsquo;s perhaps no greater exemplar of this volatility than Reddit. For good or bad, Reddit communities often serve as
+tastemakers for the Internet at large. If your content is visible on Reddit, chances are that things are going great for
+you. And if not, well, maybe not&amp;hellip;&lt;/p&gt;
+
+&lt;p&gt;The topic for today&amp;rsquo;s post is pretty simple&amp;mdash;I&amp;rsquo;m just going to show off a cool analysis related to this
+observation. The data set will be a &lt;a href=&#34;https://www.reddit.com/r/datasets/comments/3mg812/full_reddit_submission_corpus_now_available_2006/&#34;&gt;JSON dump of all Reddit
+submissions&lt;/a&gt; from
+2006 up through Summer 2015, which I&amp;rsquo;ll be analyzing for site URLs that &lt;em&gt;used&lt;/em&gt; to be popular but have recently fallen
+out of favor. The size of this dump was fairly formidable (about a quarter-terabyte uncompressed), so on the backend
+this analysis was facilitated by running Drill in a cluster configuration on a Hadoop filesystem. This kept the runtime
+of the somewhat sophisticated query I needed to perform down to well under an hour.&lt;/p&gt;
+
+&lt;p&gt;So how exactly does one go about determining which Reddit submission URLs are, technically speaking, &amp;ldquo;old and busted&amp;rdquo;?
+Well, I started off my analysis by constructing a view to keep track of the relevant parameters and convert them to the
+correct format and units. In my case I&amp;rsquo;m interested the number of times a URL shows up in a submission, the average
+posting date for each URL, and the standard deviation in submission dates (in units of days):&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW reddit AS SELECT domain, COUNT(domain) counts, TO_TIMESTAMP(avg(CAST(created_utc AS FLOAT))) avg_date, STDDEV(CAST(created_utc AS FLOAT))/86400 std_dev_days
+       FROM hdfs.`/data/RS_full_corpus.json`
+   GROUP BY domain;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;So now it becomes fairly easy to construct a query on top of this view that looks for websites with old average
+submission dates that also exhibit fairly strongly clustering (which I&amp;rsquo;ll define as an average submission date older
+than Jan. 1, 2011 with a standard deviation in submission dates of less than 600 days). These two in combination will
+define our &amp;ldquo;old and busted&amp;rdquo; criterion.&lt;/p&gt;
+
+&lt;p&gt;The query looks like this, and returns these results:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT * FROM reddit WHERE std_dev_days &amp;lt; 600 AND avg_date &amp;lt; &#39;2011-01-01 00:00:00&#39; ORDER BY counts DESC LIMIT 20;
++------------------------+---------+--------------------------+---------------------+
+|         domain         | counts  |         avg_date         |    std_dev_days     |
++------------------------+---------+--------------------------+---------------------+
+| self.reddit.com        | 647870  | 2010-09-02 13:56:28.448  | 301.71035168793304  |
+| examiner.com           | 151810  | 2010-12-16 23:26:30.526  | 585.7963478654447   |
+| news.bbc.co.uk         | 88227   | 2009-10-19 22:09:54.047  | 499.8828691832385   |
+| squidoo.com            | 68613   | 2010-02-15 05:45:45.863  | 457.7467960677672   |
+| hubpages.com           | 57290   | 2010-01-30 02:18:28.314  | 353.1463760830986   |
+| msnbc.msn.com          | 43643   | 2010-06-13 13:34:33.274  | 491.4442681051865   |
+| associatedcontent.com  | 24146   | 2009-08-18 17:40:57.408  | 403.1500022424656   |
+| tinyurl.com            | 24070   | 2010-08-28 15:11:38.083  | 471.1292710623187   |
+| self.programming       | 20689   | 2009-11-08 14:04:07.185  | 239.53706245104482  |
+| physorg.com            | 17431   | 2010-09-27 02:00:58.908  | 435.832257804899    |
+| ehow.com               | 16228   | 2009-09-19 05:58:19.334  | 524.9960557567199   |
+| gather.com             | 15387   | 2010-06-28 12:05:28.479  | 365.76299060306405  |
+| english.aljazeera.net  | 14573   | 2010-10-02 14:05:55.813  | 360.5432415872375   |
+| subimg.net             | 13459   | 2010-09-29 09:48:42.801  | 278.7920245425415   |
+| helium.com             | 13337   | 2009-09-28 16:38:56.651  | 441.641404727207    |
+| sports.espn.go.com     | 12416   | 2010-10-17 19:30:23.67   | 493.84151020454976  |
+| rapidsharelist.net     | 12128   | 2010-04-26 15:53:44.063  | 14.947036935681274  |
+| waronyou.com           | 12036   | 2009-04-13 17:51:18.434  | 184.16688348655214  |
+| timesonline.co.uk      | 11100   | 2009-05-09 01:23:30.756  | 288.42826940864705  |
+| open.salon.com         | 10727   | 2010-08-10 09:48:09.563  | 494.63567877466306  |
++------------------------+---------+--------------------------+---------------------+
+20 rows selected (2490.628 seconds)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Using this list as a starting point, I started to do a little digging (see Table 1) into why these sites are no longer
+popular. What I found is that there a lot of reasons a site may end up in this ignominious category&amp;mdash;anything from
+a shift in the Google search algorithm to a simple redirect to a new URL. Other explanations included acquisition, a
+collapsed business model, and an outright ban of the URL from Reddit by site administrators.&lt;/p&gt;
+
+&lt;p&gt;&lt;br&gt;
+&lt;p style=&#34;text-align: center;&#34;&gt;
+&lt;img style=&#34;max-width: 80%;&#34; src=&#34;kstirman.github.io/bookshelf/img/reddit_url_table.png&#34;&gt;
+&lt;/p&gt;
+&lt;p style=&#34;text-align: center; font-style: italic;&#34;&gt;&lt;b&gt;Table 1&lt;/b&gt;: A selection of formerly-fashionable websites
+submitted to Reddit, and the suspected reason for their fall from grace.&lt;/p&gt;
+&lt;br&gt;&lt;/p&gt;
+
+&lt;p&gt;This is pretty interesting stuff, right? I&amp;rsquo;m definitely looking forward to using Drill to hunt for even more trends in
+the Reddit submission data.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Tuning Parquet file performance</title>
+      <link>/kstirman.github.io/bookshelf/blog/tuning-Parquet-file-performance/</link>
+      <pubDate>Sun, 13 Dec 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/tuning-Parquet-file-performance/</guid>
+      <description>&lt;p&gt;Today I&amp;rsquo;d like to pursue a brief discussion about how changing the size of a Parquet file&amp;rsquo;s &amp;lsquo;row group&amp;rsquo; to match a file
+system&amp;rsquo;s block size can effect the efficiency of read and write performance. This tweak can be especially important on
+HDFS environments in which I/O is intrinsically tied to network operations. (Note: If you&amp;rsquo;d first like to learn about
+Parquet in a less &amp;lsquo;nuts and bolts&amp;rsquo; manner, let me recommend &lt;a href=&#34;http://www.dremio.com/blog/sql-and-parquet-a-simple-demo/&#34;&gt;this
+post&lt;/a&gt; in which I provide a simple demo of the format using
+Apache Drill).&lt;/p&gt;
+
+&lt;p&gt;To understand why the &amp;lsquo;row group&amp;rsquo; size matters, it might be useful to first understand what the heck a &amp;lsquo;row group&amp;rsquo; is.
+For this let&amp;rsquo;s refer to Figure 1, which is a simple illustration of the Parquet file format.&lt;/p&gt;
+
+&lt;p&gt;&lt;br&gt;
+&lt;br&gt;
+&lt;p style=&#34;text-align: center;&#34;&gt;
+&lt;img style=&#34;max-width: 100%;&#34; src=&#34;kstirman.github.io/bookshelf/img/parquet_block1.png&#34;&gt;
+&lt;/p&gt;
+&lt;p style=&#34;text-align: center; font-style: italic;&#34;&gt;Figure 1: The basic anatomy of a Parquet file. The left file contains
+one row group, while the right is comprised of several.&lt;/p&gt;
+&lt;br&gt;
+&lt;br&gt;&lt;/p&gt;
+
+&lt;p&gt;As you can see, a row group is a segment of the Parquet file that holds serialized (and compressed!) arrays of column
+entries. Since bigger row groups mean longer continuous arrays of column data (which is the whole point of Parquet!),
+bigger row groups are generally good news if you want faster Parquet file operations.&lt;/p&gt;
+
+&lt;p&gt;But how does the block size of the disk come into play? Let&amp;rsquo;s look at Figure 2, which explores three different Parquet
+storage scenarios for an HDFS file system. In Scenario A, very large Parquet files are stored using large row groups.
+The large row groups are good for executing efficient column-based manipulations, but the groups and files are prone to
+spanning multiple disk blocks, which risks latency by invoking I/O operations. In Scenario B, small files are stored
+using a single small row group. This mitigates the number of block crossings, but reduces the efficacy of Parquet&amp;rsquo;s
+columnar storage format.&lt;/p&gt;
+
+&lt;p&gt;&lt;br&gt;
+&lt;br&gt;
+&lt;p style=&#34;text-align: center;&#34;&gt;
+&lt;img style=&#34;max-width: 100%;&#34; src=&#34;kstirman.github.io/bookshelf/img/parquet_block2.png&#34;&gt;
+&lt;/p&gt;
+&lt;p style=&#34;text-align: center; font-style: italic;&#34;&gt;Figure 2: Three different Parquet storage scenarios for an HDFS file
+system.&lt;/p&gt;
+&lt;br&gt;
+&lt;br&gt;&lt;/p&gt;
+
+&lt;p&gt;An ideal situation is demonstrated in Scenario C, in which one large Parquet file with one large row group is stored in
+one large disk block. This minimizes I/O operations, while maximizing the length of the stored columns. The &lt;a href=&#34;https://parquet.apache.org/documentation/latest/&#34;&gt;official
+Parquet documentation&lt;/a&gt; recommends a disk block/row group/file size of
+512 to 1024 MB on HDFS.&lt;/p&gt;
+
+&lt;p&gt;In Apache Drill, you can change the row group size of the Parquet files it writes by using the &lt;code&gt;ALTER SYSTEM SET&lt;/code&gt;
+command on the &lt;code&gt;store.parquet.block-size&lt;/code&gt; variable. For instance to set a row group size of 1 GB, you would enter:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;ALTER SYSTEM SET `store.parquet.block-size` = 1073741824;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;(Note: larger block sizes will also require more memory to manage.)&lt;/p&gt;
+
+&lt;p&gt;Parquet and Drill are already extremely well integrated when it comes to data access and storage&amp;mdash;this tweak just
+enhances an already potent symbiosis!&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

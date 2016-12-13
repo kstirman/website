@@ -1,0 +1,477 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/java/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/java/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Writing a custom SQL function for sentiment analysis</title>
+      <link>/kstirman.github.io/bookshelf/blog/writing-a-custom-SQL-function-for-sentiment-analysis/</link>
+      <pubDate>Thu, 28 Jan 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/writing-a-custom-SQL-function-for-sentiment-analysis/</guid>
+      <description>
+
+&lt;p&gt;In the world of data analytics a &amp;lsquo;sentiment analysis&amp;rsquo; is any technique that attempts to represent the feelings of users
+in a somewhat quantitative way. Implementations of this idea vary, but one of the simplest ones involves giving
+individual words a numeric score according to the strength of the positive or negative the emotions that they elicit.
+For instance we might assign a score of -2.3 to the word &amp;lsquo;disappointment&amp;rsquo; and a score of 1.8 to &amp;lsquo;lighthearted.&amp;rsquo;&lt;/p&gt;
+
+&lt;p&gt;In today&amp;rsquo;s article I&amp;rsquo;m going to demonstrate that writing a custom SQL function (also known as a user defined function,
+or UDF) that performs a sentiment analysis is a fairly straightforward task. The SQL platform we&amp;rsquo;ll be using for this
+project is Apache Drill; A software capable of querying &lt;em&gt;many&lt;/em&gt; different types of data stores that also allows for the
+creation of custom functions written in the Java programming language.&lt;/p&gt;
+
+&lt;p&gt;This isn&amp;rsquo;t the first time I&amp;rsquo;ve written about creating a UDF for Drill, and readers looking for a richer set of
+information about UDF programming may want to refer to &lt;a href=&#34;http://www.dremio.com/blog/querying-google-analytics-json-with-a-custom-sql-function/&#34;&gt;this earlier
+article&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h2 id=&#34;downloading-maven-and-starting-a-new-project&#34;&gt;Downloading Maven and starting a new project&lt;/h2&gt;
+
+&lt;p&gt;Just as before, we&amp;rsquo;ll want to start by downloading and installing Apache Maven (&lt;a href=&#34;https://maven.apache.org/download.cgi&#34;&gt;available
+here&lt;/a&gt;), which will be responsible for managing and building our Java project:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ tar xzvf apache-maven-3.3.9-bin.tar.gz
+$ mv apache-maven-3.3.9 apache-maven
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And since you&amp;rsquo;ll probably be using it fairly frequently it might be nice to put the Maven binary in the PATH environment
+variable, so add this line to your &lt;code&gt;.bashrc&lt;/code&gt; file:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;export PATH=$PATH:~/apache-maven/bin
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now go to whatever directory you&amp;rsquo;d like to store your UDFs in and issue this Maven command to create a new project for
+our sentiment analyzer called &amp;lsquo;simplesentiment&amp;rsquo;:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ mvn archetype:generate -DgroupId=com.dremio.app -DartifactId=simplesentiment -DinteractiveMode=false
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Because our UDF relies on Apache Drill, we&amp;rsquo;ll need to add a couple things to the project&amp;rsquo;s &lt;code&gt;pom.xml&lt;/code&gt; configuration file.
+The first should go within the &lt;code&gt;&amp;lt;dependencies&amp;gt;&lt;/code&gt; tag:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;lt;dependency&amp;gt;
+  &amp;lt;groupId&amp;gt;org.apache.drill.exec&amp;lt;/groupId&amp;gt;
+  &amp;lt;artifactId&amp;gt;drill-java-exec&amp;lt;/artifactId&amp;gt;
+  &amp;lt;version&amp;gt;1.4.0&amp;lt;/version&amp;gt;
+&amp;lt;/dependency&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;and the next should go inside the outermost tag called &lt;code&gt;&amp;lt;project&amp;gt;&lt;/code&gt;:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;lt;build&amp;gt;
+  &amp;lt;plugins&amp;gt;
+    &amp;lt;plugin&amp;gt;
+      &amp;lt;groupId&amp;gt;org.apache.maven.plugins&amp;lt;/groupId&amp;gt;
+      &amp;lt;artifactId&amp;gt;maven-source-plugin&amp;lt;/artifactId&amp;gt;
+      &amp;lt;version&amp;gt;2.4&amp;lt;/version&amp;gt;
+      &amp;lt;executions&amp;gt;
+        &amp;lt;execution&amp;gt;
+          &amp;lt;id&amp;gt;attach-sources&amp;lt;/id&amp;gt;
+          &amp;lt;phase&amp;gt;package&amp;lt;/phase&amp;gt;
+          &amp;lt;goals&amp;gt;
+            &amp;lt;goal&amp;gt;jar-no-fork&amp;lt;/goal&amp;gt;
+          &amp;lt;/goals&amp;gt;
+        &amp;lt;/execution&amp;gt;
+      &amp;lt;/executions&amp;gt;
+    &amp;lt;/plugin&amp;gt;
+  &amp;lt;/plugins&amp;gt;
+&amp;lt;/build&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Finally we need to make a &lt;code&gt;./src/main/resources/drill-module.conf&lt;/code&gt; file for the project (you&amp;rsquo;ll probably need to create
+the &amp;lsquo;resources&amp;rsquo; directory, so go ahead and do that). This file should have these contents:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;drill {
+  classpath.scanning {
+    packages : ${?drill.classpath.scanning.packages} [
+      com.yourgroupidentifier.udf
+    ]
+  }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Where &lt;code&gt;com.yourgroupidentifier.udf&lt;/code&gt; should be the same name as the &lt;code&gt;package&lt;/code&gt; specified in the Java files listed in the
+next section.&lt;/p&gt;
+
+&lt;h2 id=&#34;sentiment-analysis-udf-source-code&#34;&gt;Sentiment analysis UDF source code&lt;/h2&gt;
+
+&lt;p&gt;The sentiment analyzer in my UDF follows the simple algorithm that I described earlier, with the values for words
+provided by &lt;a href=&#34;https://github.com/cjhutto/vaderSentiment/blob/master/build/lib/vaderSentiment/vader_sentiment_lexicon.txt&#34;&gt;this
+file&lt;/a&gt;
+(&lt;code&gt;vader_sentiment_lexicon.txt&lt;/code&gt;) available on Github from user &amp;lsquo;cjhutto.&amp;rsquo;&lt;/p&gt;
+
+&lt;p&gt;Because Drill is picky about the format of a UDF class, this custom function had to be expressed in two different source
+files: one to define all the function&amp;rsquo;s operations, and another for a simple class to hold the dictionary that
+translates words to numeric sentiment values. For this project, these files will be located in the project&amp;rsquo;s
+&lt;code&gt;main/java/com/yourgroupidentifier/udf&lt;/code&gt; directory.&lt;/p&gt;
+
+&lt;p&gt;The first file, &lt;code&gt;simpleSent.java&lt;/code&gt; looks like:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;package com.yourgroupidentifier.udf;
+
+import org.apache.drill.exec.expr.DrillSimpleFunc;
+import org.apache.drill.exec.expr.holders.Float8Holder;
+import org.apache.drill.exec.expr.holders.NullableVarCharHolder;
+
+import org.apache.drill.exec.expr.annotations.FunctionTemplate;
+import org.apache.drill.exec.expr.annotations.Output;
+import org.apache.drill.exec.expr.annotations.Param;
+
+@FunctionTemplate(
+        name = &amp;quot;simplesent&amp;quot;,
+        scope = FunctionTemplate.FunctionScope.SIMPLE,
+        nulls = FunctionTemplate.NullHandling.NULL_IF_NULL
+)
+
+public class simpleSent implements DrillSimpleFunc {
+
+    // The input to the function---almost certainly a text field
+    @Param
+    NullableVarCharHolder input;
+
+    // The output of the function---just a number
+    @Output
+    Float8Holder out;
+
+    public void setup() {
+
+        // Initialize object that holds dictionary
+        new com.yourgroupidentifier.udf.dictHolder();
+
+        // Open the sentiment values file
+        try {
+            java.io.FileReader fileReader = new java.io.FileReader(&amp;quot;/path/to/vader_sentiment_lexicon.txt&amp;quot;);
+            java.io.BufferedReader bufferedReader = new java.io.BufferedReader(fileReader);
+
+            String currLine;
+
+            // Read each line
+            try {
+                while ((currLine = bufferedReader.readLine()) != null) {
+                    String[] splitLine = currLine.split(&amp;quot;\\s+&amp;quot;);
+
+                    String currWord = splitLine[0];
+                    Double currValue;
+                    try {
+                        currValue = Double.parseDouble(splitLine[1]);
+                    }
+                    catch (java.lang.NumberFormatException numberEx) {
+                        currValue = 0.0;
+                    }
+
+                    // Put sentiment value in dictionary
+                    com.yourgroupidentifier.udf.dictHolder.sentiDict.put(currWord, currValue);
+                }
+            }
+            catch(java.io.IOException ioEx) {
+                System.out.print(&amp;quot;IOException encountered&amp;quot;);
+            }
+
+        }
+        catch(java.io.FileNotFoundException fileEx) {
+            System.out.println(&amp;quot;Sentiment valences file not found!&amp;quot;);
+        }
+    }
+
+    public void eval() {
+
+        // Initialize output value
+        out.value = 0.0;
+
+        // Split up the input string
+        String inputString = org.apache.drill.exec.expr.fn.impl.StringFunctionHelpers.toStringFromUTF8(input.start, input.end, input.buffer);
+        String[] splitInputString = inputString.split(&amp;quot;\\s+&amp;quot;);
+
+        for(int i = 0; i &amp;lt; splitInputString.length; i++) {
+
+            java.lang.Object result = com.yourgroupidentifier.udf.dictHolder.sentiDict.get(splitInputString[i].toLowerCase());
+
+            if(result != null) {
+
+                Double wordValue = ((Double) result);
+
+                out.value += wordValue;
+            }
+        }
+
+    }
+
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;(Remember to change the line with &lt;code&gt;/path/to/vader_sentiment_lexicon.txt&lt;/code&gt; so that it reflects the location of the file on
+your system!)&lt;/p&gt;
+
+&lt;p&gt;The second file is called &lt;code&gt;dictHolder.java&lt;/code&gt;, and contains this small class:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;package com.yourgroupidentifier.udf;
+
+public class dictHolder {
+    static public java.util.Hashtable&amp;lt;String, Double&amp;gt; sentiDict;
+
+    public dictHolder() {
+        sentiDict = new java.util.Hashtable&amp;lt;String, Double&amp;gt;();
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;building-and-installing-our-udf&#34;&gt;Building and installing our UDF&lt;/h2&gt;
+
+&lt;p&gt;To build and install the custom function, just go to the project&amp;rsquo;s root directory (the one with &lt;code&gt;pom.xml&lt;/code&gt;) and issue
+these commands&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ mvn clean package
+$ cp target/*.jar ~/apache-drill/jars/3rdparty
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;changing the second command to be appropriate for your Drill install.&lt;/p&gt;
+
+&lt;p&gt;And that&amp;rsquo;s literally all there is to it! You should now be able to invoke the &lt;code&gt;SIMPLESENT()&lt;/code&gt; function from within
+Drill&amp;rsquo;s SQL prompt. In the next article I&amp;rsquo;ll be doing exactly that as I explore a corpus of Reddit submission titles
+using this handy new analysis tool.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Querying Google Analytics JSON with a custom SQL function</title>
+      <link>/kstirman.github.io/bookshelf/blog/querying-google-analytics-JSON-with-a-custom-SQL-function/</link>
+      <pubDate>Fri, 30 Oct 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/querying-google-analytics-JSON-with-a-custom-SQL-function/</guid>
+      <description>&lt;p&gt;&lt;a href=&#34;kstirman.github.io/bookshelf/blog/using-sql-to-interface-with-google-analytics-data-stored-on-amazon-s3/&#34;&gt;Last time&lt;/a&gt; I wrapped up
+by showing you how to look at Google Analytics JSON using a nested SQL query in Apache Drill.  This approach is fine,
+but by implementing a custom function in Drill we can talk to the same data using a much simpler query.&lt;/p&gt;
+
+&lt;p&gt;To get started making user defined functions (UDFs), you first need to download and install &lt;a href=&#34;https://maven.apache.org/download.cgi&#34;&gt;Apache
+Maven&lt;/a&gt;. Once you have the tarball, move it to your home directory, and then do:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;tar xzvf apache-maven-3.3.3-bin.tar.gz
+mv apache-maven-3.3.3 apache-maven
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;You should also put Maven&amp;rsquo;s &lt;code&gt;bin&lt;/code&gt; directory in your system path, so add the line&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;export PATH=$PATH:~/apache-maven/bin
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;to the end of your &lt;code&gt;.bashrc&lt;/code&gt; or &lt;code&gt;.bash_profile&lt;/code&gt; file. Next we need to create a new project in Maven for our custom
+function. You can do this by issuing a command like:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;mvn archetype:generate -DgroupId=com.yourgroupidentifier.udf -DartifactId=gahelper -DinteractiveMode=false
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;in whatever folder you prefer to store the project. We&amp;rsquo;re going to call our Google Analytics helper function GAHELPER(),
+although you&amp;rsquo;re free to call it whatever you prefer (in fact, FRANK() has a nice ring to it). Now cd to the &amp;lsquo;gahelper&amp;rsquo;
+(or &amp;lsquo;frank&amp;rsquo;!) directory, and open up the configuration file for the project: &lt;code&gt;pom.xml&lt;/code&gt;. Add the following new dependecy
+under the &lt;code&gt;&amp;lt;dependencies&amp;gt;&lt;/code&gt; XML tag:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;lt;dependency&amp;gt;
+  &amp;lt;groupId&amp;gt;org.apache.drill.exec&amp;lt;/groupId&amp;gt;
+  &amp;lt;artifactId&amp;gt;drill-java-exec&amp;lt;/artifactId&amp;gt;
+  &amp;lt;version&amp;gt;1.2.0&amp;lt;/version&amp;gt;
+&amp;lt;/dependency&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Then place this block one level under the main &lt;code&gt;&amp;lt;project&amp;gt;&lt;/code&gt; tag:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;lt;build&amp;gt;
+  &amp;lt;plugins&amp;gt;
+    &amp;lt;plugin&amp;gt;
+      &amp;lt;groupId&amp;gt;org.apache.maven.plugins&amp;lt;/groupId&amp;gt;
+      &amp;lt;artifactId&amp;gt;maven-source-plugin&amp;lt;/artifactId&amp;gt;
+      &amp;lt;version&amp;gt;2.4&amp;lt;/version&amp;gt;
+      &amp;lt;executions&amp;gt;
+        &amp;lt;execution&amp;gt;
+          &amp;lt;id&amp;gt;attach-sources&amp;lt;/id&amp;gt;
+          &amp;lt;phase&amp;gt;package&amp;lt;/phase&amp;gt;
+          &amp;lt;goals&amp;gt;
+            &amp;lt;goal&amp;gt;jar-no-fork&amp;lt;/goal&amp;gt;
+          &amp;lt;/goals&amp;gt;
+        &amp;lt;/execution&amp;gt;
+      &amp;lt;/executions&amp;gt;
+    &amp;lt;/plugin&amp;gt;
+  &amp;lt;/plugins&amp;gt;
+&amp;lt;/build&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Before we start messing with the actual code of the project, we need to do one last thing so that Drill knows
+to treat what we&amp;rsquo;re making as a function we can use in queries. Make this folder from within the base directory of your
+project (the one that has &lt;code&gt;pom.xml&lt;/code&gt; in it):&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;mkdir ./src/main/resources
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And then create the file &lt;code&gt;./src/main/resources/drill-module.conf&lt;/code&gt;, and fill it with this configuration text:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;drill {
+  classpath.scanning {
+    packages : ${?drill.classpath.scanning.packages} [
+      com.yourgroupidentifier.udf
+    ]
+  }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Okay: Time to check out some UDF source code! Go to the project&amp;rsquo;s &lt;code&gt;src/main/java/com/yourgroupidentifier/udf&lt;/code&gt;
+directory, delete &lt;code&gt;App.java&lt;/code&gt;, and create a new file named &lt;code&gt;gaHelper.java&lt;/code&gt;. Paste in the following source (note that the
+package name listed here should be the same as the one given in the &lt;code&gt;drill-module.conf&lt;/code&gt; file we just made):&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;// This software is covered under the Apache 2.0 license
+// Read here: http://www.apache.org/licenses/LICENSE-2.0
+
+package com.yourgroupidentifier.udf;
+
+import org.apache.drill.exec.expr.DrillSimpleFunc;
+
+import org.apache.drill.exec.expr.annotations.FunctionTemplate;
+import org.apache.drill.exec.expr.annotations.Param;
+import org.apache.drill.exec.expr.annotations.Output;
+
+import org.apache.drill.exec.vector.complex.reader.FieldReader;
+
+import io.netty.buffer.DrillBuf;
+import org.apache.drill.exec.vector.complex.writer.BaseWriter;
+
+import javax.inject.Inject;
+
+@FunctionTemplate(name=&amp;quot;gahelper&amp;quot;, scope=FunctionTemplate.FunctionScope.SIMPLE, nulls=FunctionTemplate.NullHandling.NULL_IF_NULL)
+
+public class gaHelper implements DrillSimpleFunc {
+
+  @Param FieldReader columnsArray;
+  @Param FieldReader rowArray;
+
+  @Output BaseWriter.ComplexWriter outWriter;
+
+  @Inject DrillBuf outBuffer;
+
+  public void setup() {}
+
+  public void eval() {
+
+    org.apache.drill.exec.vector.complex.writer.BaseWriter.MapWriter gaMapWriter = outWriter.rootAsMap();
+
+    // Index used to iterate over the &#39;rows&#39; entries
+    Integer i = 0;
+
+    // Work through &#39;columnHeaders&#39; list, lining it up with the fields in a &#39;rows&#39; entry
+    while(columnsArray.next()) {
+
+      // Pull name and type information about the column
+      String colNameString = columnsArray.reader(&amp;quot;name&amp;quot;).readText().toString();
+      String colTypeString = columnsArray.reader(&amp;quot;dataType&amp;quot;).readText().toString();
+
+      // And the corresponding entry from the &#39;rows&#39; list
+      String rowString = rowArray.readText(i).toString();
+
+      // Save data to the map according to the type indicated in &#39;columnHeaders&#39;
+      if (colTypeString.equals(&amp;quot;INTEGER&amp;quot;)) {
+
+        org.apache.drill.exec.expr.holders.IntHolder intHolder = new org.apache.drill.exec.expr.holders.IntHolder();
+
+        intHolder.value = Integer.parseInt(rowString);
+
+        gaMapWriter.integer(colNameString).write(intHolder);
+      }
+      else if (colTypeString.equals(&amp;quot;TIME&amp;quot;) || colTypeString.equals(&amp;quot;FLOAT&amp;quot;) || colTypeString.equals(&amp;quot;PERCENT&amp;quot;) || colTypeString.equals(&amp;quot;CURRENCY&amp;quot;)) {
+
+        org.apache.drill.exec.expr.holders.Float8Holder floatHolder = new org.apache.drill.exec.expr.holders.Float8Holder();
+
+        floatHolder.value = Float.parseFloat(rowString);
+
+        gaMapWriter.float8(colNameString).write(floatHolder);
+      }
+      // If it&#39;s not one of these, just treat it as a &amp;quot;STRING&amp;quot;
+      else {
+
+        org.apache.drill.exec.expr.holders.VarCharHolder rowHolder = new org.apache.drill.exec.expr.holders.VarCharHolder();
+
+        byte[] rowStringBytes = rowString.getBytes();
+
+        outBuffer.reallocIfNeeded(rowStringBytes.length);
+        outBuffer.setBytes(0, rowStringBytes);
+
+        rowHolder.start = 0;
+        rowHolder.end = rowStringBytes.length;
+        rowHolder.buffer = outBuffer;
+
+        gaMapWriter.varChar(colNameString).write(rowHolder);
+      }
+
+      i++;
+    }
+  }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;A more detailed explanation of UDF source code is available in the &lt;a href=&#34;https://drill.apache.org/docs/tutorial-develop-a-simple-function/&#34;&gt;Drill
+documentation&lt;/a&gt;, but here are the basics: The &amp;lsquo;@Param&amp;rsquo;
+annotations indicate variable types for the first and second inputs to the function, and &amp;lsquo;@Output&amp;rsquo; does the same for
+(you guessed it) the output. After we set up a Drill buffer with the &amp;lsquo;@Inject&amp;rsquo; line, &amp;lsquo;@FunctionTemplate()&amp;rsquo; specifies
+some function behavior, including the name we&amp;rsquo;ll use to invoke it from the command line interface. For this UDF we don&amp;rsquo;t
+need to do anything in &amp;lsquo;setup(),&amp;rsquo; but we do need to fill in &amp;lsquo;eval()&amp;rsquo; with code that defines the operation of the
+function.&lt;/p&gt;
+
+&lt;p&gt;In the case of GAHELPER(), the function processes the first arugment (the &amp;lsquo;columnHeaders&amp;rsquo; entry of the Google Analytics
+JSON), along with the second argument (the &amp;lsquo;rows&amp;rsquo; entry), to output a map of keys and values for each row of the GA
+data. Along the way it also determines the variable type from &amp;lsquo;columnHeaders&amp;rsquo; so we can, for example, immediately talk
+to integers in the output map like they &lt;em&gt;are&lt;/em&gt; integers instead of having to pass them through a CAST() like we did in the
+last article.&lt;/p&gt;
+
+&lt;p&gt;Now build the source by running &lt;code&gt;mvn clean package&lt;/code&gt; in the directory that contains &lt;code&gt;pom.xml&lt;/code&gt;, and then copy the
+resulting files to the Drill install:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;cp target/*.jar ~/apache-drill/jars/3rdparty
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now launch &lt;code&gt;drill-embedded&lt;/code&gt; and give it a try. The output of the function (truncated somewhat by hand) has a structure like:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;SELECT GAHELPER(ga_table.columnHeaders,FLATTEN(ga_table.`rows`)) FROM `s3-ga`.`google_analytics_dev_2015-10-19.json`
+ga_table;
++--------+
+| EXPR$0 |
++--------+
+| {&amp;quot;ga:browser&amp;quot;:&amp;quot;Chrome&amp;quot;,&amp;quot;ga:browserVersion&amp;quot;:&amp;quot;39.0.2171.71&amp;quot;,&amp;quot;ga:screenResolution&amp;quot;:&amp;quot;1024x768&amp;quot;,&amp;quot;ga:deviceCategory&amp;quot;:&amp;quot;desktop&amp;quot;,...} |
+| {&amp;quot;ga:browser&amp;quot;:&amp;quot;Chrome&amp;quot;,&amp;quot;ga:browserVersion&amp;quot;:&amp;quot;39.0.2171.71&amp;quot;,&amp;quot;ga:screenResolution&amp;quot;:&amp;quot;1024x768&amp;quot;,&amp;quot;ga:deviceCategory&amp;quot;:&amp;quot;desktop&amp;quot;,...} |
+| {&amp;quot;ga:browser&amp;quot;:&amp;quot;Chrome&amp;quot;,&amp;quot;ga:browserVersion&amp;quot;:&amp;quot;40.0.2214.111&amp;quot;,&amp;quot;ga:screenResolution&amp;quot;:&amp;quot;(not set)&amp;quot;,&amp;quot;ga:deviceCategory&amp;quot;:&amp;quot;desktop&amp;quot;,...} |
+| ... |
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now remember that using only standard Drill functions, the query I ended on last time looked like this:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-sql&#34;&gt;  SELECT `Date`, `Hour`, Browser, Version, Resolution, Device, SUM(CAST(Sessions AS INTEGER)) `Total Sessions`
+    FROM (SELECT data[4] `Date`, data[5] `Hour`, data[0] Browser, data[1] Version, data[2] Resolution, data[3] Device, data[8] Sessions
+            FROM (SELECT FLATTEN(ga_table.`rows`) data
+                    FROM `s3-ga`.`google_analytics_dev_2015-10-19.json` ga_table))
+GROUP BY `Date`, `Hour`, Browser, Version, Resolution, Device
+ORDER BY `Date`, `Hour`;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;But if we use the awesome power of the GAHELPER() UDF, we can perform the same query with:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-sql&#34;&gt;  SELECT m.r.`ga:date` `Date`, m.r.`ga:hour` `Hour`, m.r.`ga:browser` Browser, m.r.`ga:browserVersion` Version,
+         m.r.`ga:screenResolution` Resolution, m.r.`ga:deviceCategory` Device, SUM(m.r.`ga:sessions`) `Total Sessions`
+    FROM (SELECT GAHELPER(ga_table.columnHeaders,FLATTEN(ga_table.`rows`)) AS r
+            FROM `s3-ga`.`google_analytics_dev_2015-10-19.json` ga_table) AS m
+GROUP BY m.r.`ga:date`, m.r.`ga:hour`, m.r.`ga:browser`, m.r.`ga:browserVersion`, m.r.`ga:screenResolution`, m.r.`ga:deviceCategory`
+ORDER BY m.r.`ga:date`, m.r.`ga:hour`;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Note the advantages here! We only need &lt;em&gt;one&lt;/em&gt; subquery now, and we can reference the data directly using intrinsic Google
+Analytics names (&amp;lsquo;ga:browserVersion&amp;rsquo;, etc.). In fact, by eliminating the need to manually determine what each index
+means (&amp;lsquo;4&amp;rsquo; for &amp;lsquo;Date&amp;rsquo;, or &amp;lsquo;0&amp;rsquo; for &amp;lsquo;Browser&amp;rsquo;) we&amp;rsquo;re skipping a whole step that&amp;rsquo;s implicit in the first query. And don&amp;rsquo;t
+forget that now we can call SUM() directly on the sessions count without a preceeding CAST() since GAHELPER() is smart
+enough to determine the types of values.&lt;/p&gt;
+
+&lt;p&gt;So that&amp;rsquo;s my whirlwind tour of the custom function capability of Apache Drill. Time to start thinking about how a UDF
+could improve your data experience!&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

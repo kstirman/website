@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Bringing SQL to MongoDB with Apache Drill</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Bringing SQL to MongoDB with Apache Drill</h1>
+          <h4>by Nathan Griffith on 2015-09-20</h4>
+          
+
+<p>If you’re reading this post, then chances are you’ve found yourself wishing you
+could talk to your MongoDB data store using a standard SQL interface. There are
+lots of good reasons to do this: Maybe you’d like to port some existing code
+with a minimum of fuss, or maybe you’re dealing with a lot of different data
+storage types and would like to unify them all under a single interface (hint:
+Apache Drill is fantastic for this). Whatever your reason, this guide will step
+you through a simple single-computer example of how to connect these two tools.
+I’ll be demonstrating how to accomplish this task on a Linux system, but
+MongoDB and Apache Drill are both available for OS X and Windows as well.</p>
+
+<h2 id="step-1-install-mongodb">Step 1: Install MongoDB</h2>
+
+<p>First we need to download a tarball of the MongoDB software,
+so pop open a terminal and grab it with this command:</p>
+
+<pre><code>$ wget https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-3.0.6.tgz
+</code></pre>
+
+<p>Next we’ll make a folder in our home directory where MongoDB will reside, extract the tarball we downloaded, and copy the contents to that directory (feel free to delete redundant files as you go here):</p>
+
+<pre><code>$ mkdir ~/mongodb
+$ tar xzvf mongodb-linux-x86_64–3.0.6.tgz
+$ cp -r ~/mongodb-linux-x86_64–3.0.6/* ~/mongodb
+</code></pre>
+
+<p>It would probably be a good idea to put the MongoDB binaries directory in the system PATH, so edit ~/.bashrc and insert this statement:</p>
+
+<pre><code>export PATH=~/mongodb/bin:$PATH
+</code></pre>
+
+<p>Now we’ll make a folder to house MongoDB databases within our home directory, and start the MongoDB daemon.</p>
+
+<pre><code>$ mkdir ~/mongodb/data
+$ mongod --dbpath ~/mongodb/data &amp;
+</code></pre>
+
+<p>Or if you’d prefer to not have the daemon attached to your terminal (so it can stay open when you close the window) instead run:</p>
+
+<pre><code>$ nohup mongod --dbpath ~/mongodb/data &amp;
+</code></pre>
+
+<h2 id="step-2-loading-some-example-data-into-mongodb">Step 2: Loading Some Example Data Into MongoDB</h2>
+
+<p>For the example data in this guide I’ve decided to use the results of a query to <a href="http://earthquake.usgs.gov/earthquakes/search/">this USGS archive of seismic
+events</a>. I ended up taking all events from 1980 through 2014 that
+occurred within a region that I defined using the web interface (see Figure 1).</p>
+
+<p><br>
+<br>
+<p style="text-align: center;">
+<img style="max-width: 100%;" src="/img/earthquake_map.png">
+</p>
+<p style="text-align: center; font-style: italic;">Figure 1: My example data set contains seismic event data from this
+region of the United States. Events date from Jan. 1, 1980 to Dec. 31, 2014.</p>
+<br>
+<br></p>
+
+<p>A number of options are available for output on the web site, and I decided to go with CSV. We can import a CSV file (in this case the result of the USGS query, renamed to ‘quakes.csv’) into MongoDB using the following command:</p>
+
+<pre><code>$ mongoimport --db quakedata --type csv --headerline --file quakes.csv
+</code></pre>
+
+<p>Note: This command creates a MongoDB collection called ‘quakes’ in a database named ‘quakedata.’
+To verify that the imported data is indeed accessible via our MongoDB server, we enter the mongo shell by typing</p>
+
+<pre><code>$ mongo
+</code></pre>
+
+<p>Now we can switch to the ‘quakedata’ database, and enter this simple query which asks for a single event with a magnitude of 5.1:</p>
+
+<pre><code>&gt; use quakedata
+switched to db quakedata
+&gt; db.quakes.find({mag:5.1}).limit(1).pretty()
+{
+  &quot;_id&quot; : ObjectId(&quot;55fdd74548f529cf40132523&quot;),
+  &quot;time&quot; : &quot;1983–10–07T10:18:46.150Z&quot;,
+  &quot;latitude&quot; : 43.938,
+  &quot;longitude&quot; : -74.258,
+  &quot;depth&quot; : 12.5,
+  &quot;mag&quot; : 5.1,
+  &quot;magType&quot; : &quot;mb&quot;,
+  &quot;nst&quot; : &quot;&quot;,
+  &quot;gap&quot; : &quot;&quot;,
+  &quot;dmin&quot; : &quot;&quot;,
+  &quot;rms&quot; : &quot;&quot;,
+  &quot;net&quot; : &quot;us&quot;,
+  &quot;id&quot; : &quot;usp0001yuv&quot;,
+  &quot;updated&quot; : &quot;2015–02–11T17:15:07.000Z&quot;,
+  &quot;place&quot; : &quot;New York&quot;,
+  &quot;type&quot; : &quot;earthquake&quot;
+}
+</code></pre>
+
+<p>It looks like our MongoDB is up and running!</p>
+
+<h2 id="step-3-installing-and-configuring-apache-drill">Step 3: Installing and Configuring Apache Drill</h2>
+
+<p>To install Apache Drill we’ll first grab another tarball:</p>
+
+<pre><code>wget http://getdrill.org/drill/download/apache-drill-1.1.0.tar.gz
+</code></pre>
+
+<p>Then, just like before, we’ll make an install folder inside our home directory, placing the contents of the decompressed .tgz file within.</p>
+
+<pre><code>$ mkdir ~/apache-drill
+$ tar xzvf apache-drill-1.1.0.tar.gz
+$ cp -r ~/apache-drill-1.1.0/* ~/apache-drill
+</code></pre>
+
+<p>And if you’d like the Drill binary directory in your system path, add this to your ~/.bashrc file:</p>
+
+<pre><code>PATH=~/apache-drill/bin:$PATH
+</code></pre>
+
+<p>Next we need to configure Drill so that it sees our MongoDB database. To do this first start the Drill shell by running</p>
+
+<pre><code>$ drill-embedded
+</code></pre>
+
+<p>(don’t be afraid if it takes a while to start). Then direct a web browser to the address <a href="http://127.0.0.1:8047">http://127.0.0.1:8047</a>. This page is called the Drill Web Console.
+Now select Storage from the top menu bar, and click Update next to the entry named ‘mongo’ that appears under the Disabled Storage Plugins heading. On the page that loads, click “Enable.”
+That’s it! Now if you type “show databases;” into the Apache Drill shell, you ought to see the database “mongo.quakedata” listed.</p>
+
+<pre><code>&gt; show databases;
++ — — — — — — — — — — -+
+|     SCHEMA_NAME      |
++ — — — — — — — — — — -+
+| INFORMATION_SCHEMA   |
+| cp.default           |
+| dfs.default          |
+| dfs.root             |
+| dfs.tmp              |
+| mongo.local          |
+| mongo.quakedata      |
+| sys                  |
++ — — — — — — — — — — -+
+8 rows selected (0.591 seconds)
+
+</code></pre>
+
+<p>And we can switch to our seismic information database by simply typing</p>
+
+<pre><code>USE mongo.quakedata;
+</code></pre>
+
+<h2 id="step-4-manipulating-a-mongodb-database-with-ansi-sql">Step 4: Manipulating a MongoDB database with ANSI SQL</h2>
+
+<p>A.k.a. “The fun part.” Now that we have Apache Drill installed and configured to work with our MongoDB database we can immediately start inspecting our data using a standard SQL interface.
+For instance if we wanted to see the different types of seismic events cataloged in our data set, we would just use the standard SQL:</p>
+
+<pre><code>&gt; SELECT DISTINCT type FROM quakes;
++ — — — — — — — — — -+
+|       type         |
++ — — — — — — — — — -+
+| mining explosion   |
+| earthquake         |
+| quarry blast       |
+| explosion          |
+| rock burst         |
++ — — — — — — — — — -+
+5 rows selected (8.312 seconds)
+</code></pre>
+
+<p>Before we do anything more sophisticated, it would probably be good to issue this command, which tells Drill to read numeric text fields as floating point numbers:</p>
+
+<pre><code>ALTER SYSTEM SET `store.mongo.read_numbers_as_double` = true;
+</code></pre>
+
+<p>So what can we do with this data set? Well, let’s use <a href="http://earthquake.usgs.gov/research/induced/">this USGS page</a> about induced earthquakes as a rough guide and look at the number of magnitude 3.0 or greater earthquakes in our data that occurred between 1980 and 2009, and between 2009 and the end of 2014.
+The first (1980–2009) query:</p>
+
+<pre><code>&gt; SELECT COUNT(type) FROM quakes WHERE `time` BETWEEN '1980–01–01 00:00:00' AND '2008–12–31 23:59:59' AND mag &gt;= 3.0 AND type LIKE 'earthquake';
++ — — — — -+
+| EXPR$0   |
++ — — — — -+
+| 918      |
++ — — — — -+
+1 row selected (5.798 seconds)
+</code></pre>
+
+<p>And the second (2009–2014) query:</p>
+
+<pre><code>&gt; SELECT COUNT(type) FROM quakes WHERE `time` BETWEEN '2009–01–01 00:00:00' AND '2014–12–31 23:59:59' AND mag &gt;= 3.0 AND type LIKE 'earthquake';
++ — — — — -+
+| EXPR$0   |
++ — — — — -+
+| 1340     |
++ — — — — -+
+1 row selected (3.549 seconds)
+</code></pre>
+
+<p>(Note that since ‘time’ is a reserved keyword, we need to enclose it in backquotes to tell Drill that we’re talking about a field in our dataset).
+That’s definitely more earthquakes in a much smaller time span, and our results line up approximately with what the plot on the USGS page indicates. Now let’s issue a couple new commands to inspect the average depth of the events in these sets. Do induced quakes have a lower average depth? A higher one? We can shed some light on this by making a slight modification to the last two queries.
+For 1980–2009 we have an average depth:</p>
+
+<pre><code>&gt; SELECT AVG(depth) FROM quakes WHERE `time` BETWEEN '1980–01–01 00:00:00' AND '2008–12–31 23:59:59' AND mag &gt;= 3.0 AND type LIKE 'earthquake';
++ — — — — — — — — — — +
+|       EXPR$0        |
++ — — — — — — — — — — +
+| 8.461002178649235   |
++ — — — — — — — — — — +
+1 row selected (3.018 seconds)
+</code></pre>
+
+<p>And 2009–2014 yields:</p>
+
+<pre><code>&gt; SELECT AVG(depth) FROM quakes WHERE 'time' BETWEEN '2009–01–01 00:00:00' AND '2014–12–31 23:59:59' AND mag &gt;= 3.0 AND type LIKE 'earthquake';
++ — — — — — — — — — -+
+|      EXPR$0        |
++ — — — — — — — — — -+
+| 6.44491343283582   |
++ — — — — — — — — — -+
+1 row selected (2.385 seconds)
+</code></pre>
+
+<p>We see now that quakes from the second set have an average depth about 2 kilometers shallower than those from the first set. This makes sense, because if a significant number of recent earthquake events are due to human activity, we would expect them to drag the all-event average closer to a depth where it’s easier for humans to reach (i.e., closer to the surface).
+So that’s it for this post! As you’ve seen, creating an SQL interface to MongoDB is incredibly straightforward, and I hope this guide has helped you realize what a powerful data management tool Apache Drill can be.</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

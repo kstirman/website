@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Securing SQL on Hadoop, Part 2: Installing and configuring Drill</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Securing SQL on Hadoop, Part 2: Installing and configuring Drill</h1>
+          <h4>by Nathan Griffith on 2016-01-25</h4>
+          
+
+<p>Today we&rsquo;re going to pick up where we left off in <a href="http://www.dremio.com/blog/securing-sql-on-hadoop-part-1-installing-cdh-and-kerberos/">Part
+1</a> of my two-parter about setting
+up a CDH cluster to perform secure SQL queries on an HDFS store. As you recall, last time we had just finished using
+Cloudera Manager&rsquo;s wizard to finalize a Kerberos configuration, and all of the cluster services had come back online
+using the new security system so our basic HDFS cluster set-up was good to go. All that&rsquo;s left to do now is install and
+configure the piece of software that implements the SQL interface: Apache Drill.</p>
+
+<h2 id="step-1-drill-prerequisites">Step 1.) Drill prerequisites</h2>
+
+<p>First things first: We&rsquo;re gonna need Java 7 or better on our CDH machines. Following some useful information found
+<a href="http://lifeonubuntu.com/ubuntu-missing-add-apt-repository-command/">here</a> and
+<a href="http://askubuntu.com/questions/508546/howto-upgrade-java-on-ubuntu-14-04-lts">here</a>, we can set up a new package
+repository and pull it down using:</p>
+
+<pre><code>$ sudo apt-get install software-properties-common python-software-properties
+$ sudo add-apt-repository ppa:webupd8team/java
+$ sudo apt-get update
+$ sudo apt-get install oracle-java7-installer
+</code></pre>
+
+<p>(Remember to do this for each node on your cluster!)</p>
+
+<h2 id="step-2-install-drill">Step 2.) Install Drill</h2>
+
+<p>Time to install Drill and tell it where the cluster&rsquo;s &lsquo;Zookeeper&rsquo; is (REMEMBER: Just like installing Java, this step
+needs to be done on every node). Start by downloading and unpacking the software:</p>
+
+<pre><code>$ wget http://apache.osuosl.org/drill/drill-1.4.0/apache-drill-1.4.0.tar.gz
+$ tar xzvf apache-drill-1.4.0.tar.gz
+</code></pre>
+
+<p>Next edit Drill&rsquo;s <code>conf/drill-override.conf</code> file so that it looks like:</p>
+
+<pre><code>drill.exec: {
+  cluster-id: &quot;drill-cdh-cluster&quot;,
+  zk.connect: &quot;&lt;ZOOKEEPER IP&gt;:2181&quot;
+}
+</code></pre>
+
+<p>Where &lsquo;ZOOKEEPER IP&rsquo; should be changed to the IP of the CDH machine that runs the zookeeper process (this is probably
+the same as the Main Node from the last article).</p>
+
+<p>If you&rsquo;d like, you can add Drill to the system path by adding this to <code>.bashrc</code>:</p>
+
+<pre><code>export PATH=$PATH:/apache-drill-1.4.0/bin
+</code></pre>
+
+<h2 id="step-3-configuring-drill-for-hdfs">Step 3.) Configuring Drill for HDFS</h2>
+
+<p>Now we need to set up Drill so that it can read our cluster&rsquo;s HDFS. Open the Drill Web Console by going to
+http://&lt;MAIN NODE IP&gt;:8047. Click &lsquo;Storage&rsquo; at the top and then &lsquo;Update&rsquo; next to the dfs plugin and copy the JSON
+that you find in the text field. Next make a new storage plugin called &lsquo;hdfs&rsquo; (previous page) and then paste in the text
+you just copied, replacing the &lsquo;null&rsquo; that&rsquo;s already there.</p>
+
+<p>We&rsquo;ll proceed by making a small modification that turns this standard &lsquo;dfs&rsquo; plugin in into our new one for HDFS.</p>
+
+<p>Take the line</p>
+
+<pre><code>&quot;connection&quot;: &quot;file:///&quot;,
+</code></pre>
+
+<p>and replace it with</p>
+
+<pre><code>&quot;connection&quot;: &quot;hdfs://&lt;ADDRESS OF HDFS NAMENODE&gt;:8020&quot;,
+</code></pre>
+
+<p>Hit &ldquo;Create&rdquo; and now Drill is ready to read your HDFS data!</p>
+
+<h2 id="step-4-enabling-kerberos-support-for-drill">Step 4.) Enabling Kerberos support for Drill</h2>
+
+<p>So now we have HDFS, Kerberos, <em>and</em> Drill, but currently Drill can&rsquo;t talk to the HDFS we have running because it
+requires authentication. Let&rsquo;s fix that.</p>
+
+<p>First we should make an HDFS superuser account as indicated in this <a href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_sg_s5_hdfs_principal.html">Cloudera
+doc</a>. On the Main Node, run
+<code>sudo kadmin.local</code> and add an &lsquo;hdfs&rsquo; principal with this command:</p>
+
+<pre><code>addprinc hdfs@KERBEROS.CDH
+</code></pre>
+
+<p>(Hit Ctrl-d to exit the prompt). In order to enable authentication with Kerberos, we also need to copy the file
+<code>hadoop-yarn-api.jar</code> into Drill&rsquo;s class path:</p>
+
+<pre><code>$ cp /opt/cloudera/parcels/CDH-5.5.1-1.cdh5.5.1.p0.11/lib/hadoop/client/hadoop-yarn-api.jar ~/apache-drill/jars/
+</code></pre>
+
+<p>(NOTE: <em>The above step and the three following must be performed on each node of the cluster</em>.)</p>
+
+<p>Next, Drill&rsquo;s <code>conf/core-site.xml</code> file should be edited to contain the following snippet of xml:</p>
+
+<pre><code>&lt;property&gt;
+  &lt;name&gt;hadoop.security.authentication&lt;/name&gt;
+  &lt;value&gt;kerberos&lt;/value&gt;
+&lt;/property&gt;
+</code></pre>
+
+<p>All that&rsquo;s left to do is create an &lsquo;hdfs&rsquo; Kerberos ticket for the user that we&rsquo;re logged into</p>
+
+<pre><code>$ kinit hdfs@KERBEROS.CDH
+</code></pre>
+
+<p>and then start up each of the drillbits</p>
+
+<pre><code>drillbit.sh start
+</code></pre>
+
+<p>So now Drill has both the configuration and the authority to use our kerberized HDFS store. Give it a shot by opening up
+a Drill prompt (<code>drill-conf</code>) and trying a query.</p>
+
+<p>For example, here&rsquo;s a test query on my handy 250 GB of Reddit data:</p>
+
+<pre><code>&gt; SELECT title, TO_TIMESTAMP(CAST(created_utc AS INT)) created, score FROM hdfs.`/data/RS_full_corpus.json` WHERE over_18 = false AND score &gt;= 100 LIMIT 10;
++------------------------------------------------------------------------------+------------------------+--------+
+|                                    title                                     |        created         | score  |
++------------------------------------------------------------------------------+------------------------+--------+
+| Early Retirement Guide - Phillip Greenspun                                   | 2006-01-30 19:21:17.0  | 223    |
+| Programming Like A Mathematician I: Closures                                 | 2006-01-29 18:14:30.0  | 178    |
+| More than 1000 wikipedia alterations by US Representative Staffers           | 2006-01-29 12:57:45.0  | 304    |
+| Great Design: What is Design?                                                | 2006-01-26 20:54:30.0  | 143    |
+| Use Python (not Java) to teach programming                                   | 2006-01-26 19:43:23.0  | 167    |
+| The Demotivators!                                                            | 2006-01-26 18:02:51.0  | 168    |
+| Just how much can you achieve with pure CSS? Some amazing demonstrations.    | 2006-02-26 18:07:57.0  | 329    |
+| A summary of two lectures by Alan Kay                                        | 2006-02-24 04:56:49.0  | 110    |
+| How Intel could buy Hollywood and profit by selling more DRM-less machines.  | 2006-02-20 20:48:18.0  | 108    |
+| &quot;zeitgeist&quot; reddits, covering popular topics, eg, the infamous cartoons      | 2006-02-19 19:33:59.0  | 299    |
++------------------------------------------------------------------------------+------------------------+--------+
+</code></pre>
+
+<p>And that wraps up Part 2 of this how-to guide. May all your queries be fruitful and secure!</p>
+
+<p><em>Acknoweldgements: Many thanks to William Witt over on the user@drill.apache.org mailing list for providing crucial
+information about Kerberos-Drill configuration!</em></p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

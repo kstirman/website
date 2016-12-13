@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/nullable/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/nullable/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Managing variable type nullability</title>
+      <link>/kstirman.github.io/bookshelf/blog/managing-variable-type-nullability/</link>
+      <pubDate>Tue, 09 Feb 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/managing-variable-type-nullability/</guid>
+      <description>&lt;p&gt;One day you may find yourself with a custom function for Drill that&amp;rsquo;s very particular about the kind of variables that
+it accepts. In particular, it may hold strong opinions about whether or not a variable is allowed to express a &lt;code&gt;NULL&lt;/code&gt;
+value. In fact it may even be &lt;em&gt;you&lt;/em&gt; who wrote this unavoidably fussy function (SPOILER: This is exactly what happened to
+me earlier this week).&lt;/p&gt;
+
+&lt;p&gt;Currently Drill lacks built-in functions to add or strip nullability from variables, but luckily it&amp;rsquo;s very easy to whip
+up a couple UDFs which do exactly that. Today I&amp;rsquo;ll be showcasing two such functions which respectively add and remove
+nullability from Drill &lt;code&gt;FLOAT&lt;/code&gt; variables. As usual you should perform the necessary incantations and summoning rituals
+for creating a custom function project in Maven (see the section &amp;ldquo;Downloading Maven and starting a new project&amp;rdquo; in &lt;a href=&#34;http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/&#34;&gt;this
+article&lt;/a&gt; for a refresher).&lt;/p&gt;
+
+&lt;p&gt;Once you&amp;rsquo;re ready to start thinking about source code, the class associated with the function to add nullability looks
+like:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;package com.yourgroupidentifier.udf;
+
+import org.apache.drill.exec.expr.DrillSimpleFunc;
+import org.apache.drill.exec.expr.holders.NullableFloat8Holder;
+import org.apache.drill.exec.expr.holders.Float8Holder;
+
+import org.apache.drill.exec.expr.annotations.FunctionTemplate;
+import org.apache.drill.exec.expr.annotations.Output;
+import org.apache.drill.exec.expr.annotations.Param;
+
+@FunctionTemplate(
+        name = &amp;quot;add_null_float&amp;quot;,
+        scope = FunctionTemplate.FunctionScope.SIMPLE,
+        nulls = FunctionTemplate.NullHandling.INTERNAL
+)
+
+public class addNullFloat implements DrillSimpleFunc {
+
+    @Param
+    Float8Holder input;
+
+    @Output
+    NullableFloat8Holder output;
+
+    public void setup() {
+    }
+
+    public void eval() {
+        output.isSet = 1;
+        output.value = input.value;
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;while the one for removing nullability is as follows:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;package com.yourgroupidentifier.udf;
+
+import org.apache.drill.exec.expr.DrillSimpleFunc;
+import org.apache.drill.exec.expr.holders.NullableFloat8Holder;
+import org.apache.drill.exec.expr.holders.Float8Holder;
+
+import org.apache.drill.exec.expr.annotations.FunctionTemplate;
+import org.apache.drill.exec.expr.annotations.Output;
+import org.apache.drill.exec.expr.annotations.Param;
+
+@FunctionTemplate(
+        name = &amp;quot;remove_null_float&amp;quot;,
+        scope = FunctionTemplate.FunctionScope.SIMPLE,
+        nulls = FunctionTemplate.NullHandling.INTERNAL
+)
+
+public class removeNullFloat implements DrillSimpleFunc {
+
+    @Param
+    NullableFloat8Holder input;
+
+    @Output
+    Float8Holder output;
+
+    public void setup() {
+    }
+
+    public void eval() {
+        output.value = input.value;
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Remember back in &lt;a href=&#34;http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/&#34;&gt;this post&lt;/a&gt; when I
+thought I was presenting the simplest UDFs I&amp;rsquo;d ever seen demonstrated? Well, these guys are definitely setting a new
+world record. They&amp;rsquo;re just about the smallest custom functions you can code for Drill. But that doesn&amp;rsquo;t mean they&amp;rsquo;re not
+useful! &lt;code&gt;ADD_NULL_FLOAT()&lt;/code&gt; and &lt;code&gt;REMOVE_NULL_FLOAT()&lt;/code&gt; make valuable additions to a Drill power user&amp;rsquo;s toolbox, and I&amp;rsquo;ll
+be putting one of them to work in a post later this week.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

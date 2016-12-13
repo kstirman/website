@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Querying for reading level with a simple UDF</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Querying for reading level with a simple UDF</h1>
+          <h4>by Nathan Griffith on 2016-02-05</h4>
+          <script type="text/javascript"
+ src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+<p>Today, just like in <a href="http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/">this post</a> from
+the previous week, I&rsquo;d like to discuss creating a simple custom SQL function for Drill that maps strings to float
+values. Except this week&rsquo;s function is even <em>more</em> simple because it can fit within a single file and requires no
+instructions in the <code>setup()</code> method. In fact, this may be the simplest example of a Drill UDF I&rsquo;ve ever seen, so if
+you&rsquo;ve been struggling with how to go about writing your own, the source code I&rsquo;m presenting today maybe a good way to
+get some traction.</p>
+
+<p>The raison d&rsquo;&ecirc;tre of today &rsquo;s function is to calculate the reading level (or, &lsquo;readability&rsquo;) of a single sentence.
+Many solutions to the problem of readability utilize syllable counts, which are notoriously difficult to arrive at
+computationally. It&rsquo;s possible that a lookup table for those counts would provide satisfactorily speedy results, but the
+algorithm that I&rsquo;ve chosen to implement, called the automated readability index or ARI, avoids this problem by
+altogether using a character count instead. As per the <a href="https://en.wikipedia.org/wiki/Automated_readability_index">Wikipedia
+article</a>, the ARI is arrived at via:</p>
+
+<p>$$ ARI = 4.71 \frac{characters}{words} + 0.5 \frac{words}{sentences} - 21.43 $$</p>
+
+<p>However, as I indicated earlier I&rsquo;m only interested in the readability of single sentences in this particular
+application (check out the next article!), so I&rsquo;m going to implicitly set the number of sentences to 1 in the source code
+that comes later.</p>
+
+<p>But before I talk about source you should probably first get some UDF-creation boilerplate out of the way.  I&rsquo;ve
+discussed how to do this a couple times, but if you&rsquo;re still unsure of what to do go ahead and follow the instructions
+in the &ldquo;Downloading Maven and starting a new project&rdquo; section near the beginning of <a href="http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/">this
+article</a>.</p>
+
+<p>Once that&rsquo;s out of the way, place this single file (<code>Readability.java</code>) in your project&rsquo;s
+<code>main/java/com/yourgroupidentifier/udf</code> directory:</p>
+
+<pre><code class="language-java">package com.yourgroupidentifier.udf;
+
+import org.apache.drill.exec.expr.DrillSimpleFunc;
+import org.apache.drill.exec.expr.holders.NullableFloat8Holder;
+import org.apache.drill.exec.expr.holders.NullableVarCharHolder;
+
+import org.apache.drill.exec.expr.annotations.FunctionTemplate;
+import org.apache.drill.exec.expr.annotations.Output;
+import org.apache.drill.exec.expr.annotations.Param;
+
+@FunctionTemplate(
+        name = &quot;readability&quot;,
+        scope = FunctionTemplate.FunctionScope.SIMPLE,
+        nulls = FunctionTemplate.NullHandling.NULL_IF_NULL
+)
+
+public class Readability implements DrillSimpleFunc {
+
+    @Param
+    NullableVarCharHolder input;
+
+    @Output
+    NullableFloat8Holder out;
+
+    public void setup() {
+    }
+
+    public void eval() {
+
+        // The length of 'pneumonoultramicroscopicsilicovolcanoconiosis'
+        final int longestWord = 45;
+
+        // Initialize output value
+        out.value = 0.0;
+
+        // Split input string up into words
+        String inputString = org.apache.drill.exec.expr.fn.impl.StringFunctionHelpers.toStringFromUTF8(input.start,
+input.end, input.buffer);
+        String[] inputStringWords = inputString.split(&quot;\\s+&quot;);
+
+        float numWords = inputStringWords.length;
+        float numCharacters = inputString.length() - (numWords-1); // Accounts for spaces
+
+        // Adjust for things in the text that aren't words
+        // i.e., They are longer than 'longestWord'
+        for(int i = 0; i &lt; inputStringWords.length; i++) {
+            if( inputStringWords[i].length() &gt; longestWord) {
+                numWords--;
+                numCharacters = numCharacters - inputStringWords[i].length();
+            }
+        }
+
+        // Output 'NULL' if the number of words is zero
+        if(numWords != 0) {
+            out.value = 4.71 * (numCharacters / numWords) + 0.5 * (numWords) - 21.43;
+        }
+        else {
+            out.isSet = 0;
+        }
+    }
+}
+</code></pre>
+
+<p>This is pretty straight forward compared to the <a href="http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/">other
+examples</a> I&rsquo;ve <a href="http://www.dremio.com/blog/querying-google-analytics-json-with-a-custom-sql-function/">discussed
+before</a>, right? Just about the
+only &lsquo;trick&rsquo; here is that I&rsquo;ve made the number the function returns a &lsquo;Nullable&rsquo; type. This is to insure that it has a
+more sane output than &lsquo;Infinity&rsquo; when it encounters a field with zero words&mdash;especially useful for when the
+function is used in conjunction with <code>AVG()</code>, which disregards NULL values but would propagate any &lsquo;Infinity&rsquo; to the
+final result.</p>
+
+<p>In the next post, we&rsquo;ll try this function out in the &lsquo;field&rsquo; on one of my favorite data sets!</p>
+
+<p>(And I <em>swear</em> I didn&rsquo;t make that pun intentionally.)</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

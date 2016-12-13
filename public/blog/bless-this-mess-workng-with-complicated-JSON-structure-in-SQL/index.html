@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Bless this mess: Working with complicated JSON structure in SQL</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Bless this mess: Working with complicated JSON structure in SQL</h1>
+          <h4>by Nathan Griffith on 2015-12-01</h4>
+          <p>Data you find on the web comes in all formats. From simple CSV to some really creepy-crawly JSON. The data provided by
+the Twitter API to describe a tweet unfortunately falls within the latter category.</p>
+
+<p>In this article I&rsquo;ll use Drill to provide an SQL interface to a MongoDB collection of about 52,000 tweets pulled from
+the Twitter streaming API. As I alluded to, tweet data presents itself in a way that manifests a lot of nested elements,
+and documents in the collection follow this JSON structure:</p>
+
+<pre><code>{
+  &quot;contributors&quot;: null,
+  &quot;coordinates&quot;: null,
+  &quot;created_at&quot;: &quot;Mon Nov 09 23:18:16 +0000 2015&quot;,
+  &quot;entities&quot;: {
+    &quot;hashtags&quot;: [],
+    &quot;media&quot;: [
+      {
+        &quot;display_url&quot;: &quot;pic.twitter.com/NNAPr46qDz&quot;,
+        &quot;expanded_url&quot;: &quot;http://twitter.com/NewsFlashback/status/663858171639939072/photo/1&quot;,
+        &quot;id&quot;: 663858170704490496,
+        &quot;id_str&quot;: &quot;663858170704490496&quot;,
+        &quot;indices&quot;: [
+          121,
+          144
+        ],
+        &quot;media_url&quot;: &quot;http://pbs.twimg.com/media/CTZ_fS4U8AAkti7.jpg&quot;,
+        &quot;media_url_https&quot;: &quot;https://pbs.twimg.com/media/CTZ_fS4U8AAkti7.jpg&quot;,
+        &quot;sizes&quot;: {
+          &quot;large&quot;: {
+            &quot;h&quot;: 450,
+            &quot;resize&quot;: &quot;fit&quot;,
+            &quot;w&quot;: 450
+          },
+          &quot;medium&quot;: {
+            &quot;h&quot;: 450,
+            &quot;resize&quot;: &quot;fit&quot;,
+            &quot;w&quot;: 450
+          },
+          &quot;small&quot;: {
+            &quot;h&quot;: 340,
+            &quot;resize&quot;: &quot;fit&quot;,
+            &quot;w&quot;: 340
+          },
+          &quot;thumb&quot;: {
+            &quot;h&quot;: 150,
+            &quot;resize&quot;: &quot;crop&quot;,
+            &quot;w&quot;: 150
+          }
+        },
+        &quot;type&quot;: &quot;photo&quot;,
+        &quot;url&quot;: &quot;https://t.co/NNAPr46qDz&quot;
+      }
+    ],
+    ... etc
+</code></pre>
+
+<p>(see <a href="https://gist.github.com/nategri/c34e1868792b23e97f2f">this link</a> for the whole entry). That looks pretty intense,
+right? But don&rsquo;t worry&mdash;Drill is up to the task! We&rsquo;ll be talking to that mess with ANSI SQL in no time.</p>
+
+<p>Assuming you&rsquo;ve already connected Drill to your MongoDB (just click &lsquo;Enable&rsquo; next to the MongoDB plugin at
+<a href="http://localhost:8047/storage">http://localhost:8047/storage</a> after running <code>drill-embedded</code>), we&rsquo;re ready to begin querying the Twitter data using SQL.</p>
+
+<p>For my analysis goal, I’m going focus on coming up with a method to examine the number of hashtags that occur in tweets
+from verified users in my data set. To begin, let’s look at the array of hashtags that the tweet JSON lists for verified
+users with at least one hashtag:</p>
+
+<pre><code class="language-sql">SELECT tw.id `Tweet Id`, tw.`user`.screen_name `Screen Name`, tw.entities.hashtags `Hashtag Array`
+  FROM dfs.`/path/to/tweets.small.json` tw
+ WHERE tw.entities.hashtags[0].text IS NOT NULL
+   AND tw.`user`.verified = true
+ LIMIT 15;
+</code></pre>
+
+<p>With results:</p>
+
+<pre><code>+---------------------+----------------+-----------------------------------------------------------------------------------+
+|      Tweet Id       |  Screen Name   |                                   Hashtag Array                                   |
++---------------------+----------------+-----------------------------------------------------------------------------------+
+| 663858238757199873  | FinishLine     | [{&quot;indices&quot;:[116,132],&quot;text&quot;:&quot;TheFundamentals&quot;}]                                  |
+| 663858343581237248  | antena3com     | [{&quot;indices&quot;:[82,97],&quot;text&quot;:&quot;MarDePlástico8&quot;}]                                     |
+| 663858351978078208  | tacobell       | [{&quot;indices&quot;:[12,28],&quot;text&quot;:&quot;TacoEmojiEngine&quot;}]                                    |
+| 663858351990697984  | tacobell       | [{&quot;indices&quot;:[14,30],&quot;text&quot;:&quot;TacoEmojiEngine&quot;}]                                    |
+| 663858553329815553  | CollegeHumor   | [{&quot;indices&quot;:[0,14],&quot;text&quot;:&quot;TheCrunchBowl&quot;}]                                       |
+| 663858746251042816  | tacobell       | [{&quot;indices&quot;:[12,28],&quot;text&quot;:&quot;TacoEmojiEngine&quot;}]                                    |
+| 663859039831486465  | VctorClavijo   | [{&quot;indices&quot;:[14,23],&quot;text&quot;:&quot;Carlos10&quot;}]                                           |
+| 663859115358158848  | FarnamHorse    | [{&quot;indices&quot;:[0,11],&quot;text&quot;:&quot;DidYouKnow&quot;}]                                          |
+| 663859161503928320  | vpelham        | [{&quot;indices&quot;:[20,29],&quot;text&quot;:&quot;feminist&quot;},{&quot;indices&quot;:[127,136],&quot;text&quot;:&quot;feminism&quot;}]   |
+| 663859312469651456  | AlPrimerToque  | [{&quot;indices&quot;:[0,18],&quot;text&quot;:&quot;LorenzoEnOndaCero&quot;}]                                   |
+| 663859425715834880  | NewsTalk770    | [{&quot;indices&quot;:[82,91],&quot;text&quot;:&quot;yycroads&quot;},{&quot;indices&quot;:[92,103],&quot;text&quot;:&quot;yyctraffic&quot;}]  |
+| 663859471844810752  | BrentASJax     | [{&quot;indices&quot;:[70,83],&quot;text&quot;:&quot;FirstAlertWX&quot;}]                                       |
+| 663859530598514688  | simpsonwhnt    | [{&quot;indices&quot;:[102,111],&quot;text&quot;:&quot;valleywx&quot;}]                                         |
+| 663859702535553024  | PrimerImpacto  | [{&quot;indices&quot;:[75,89],&quot;text&quot;:&quot;PrimerImpacto&quot;}]                                      |
+| 663859799004581888  | DPostSports    | [{&quot;indices&quot;:[41,49],&quot;text&quot;:&quot;Rockies&quot;}]                                            |
++---------------------+----------------+-----------------------------------------------------------------------------------+
+</code></pre>
+
+<p>Now I’ll use the <code>FLATTEN()</code> function on the array to make one row for each hashtag in a tweet:</p>
+
+<pre><code class="language-sql">SELECT tw.id `Tweet Id`, tw.`user`.screen_name `Screen Name`, FLATTEN(tw.entities.hashtags) `Hashtags`
+  FROM dfs.`/path/to/tweets.small.json` tw
+ WHERE tw.entities.hashtags[0].text IS NOT NULL
+   AND tw.`user`.verified = true
+ LIMIT 15;
+</code></pre>
+
+<pre><code>+---------------------+----------------+-------------------------------------------------+
+|      Tweet Id       |  Screen Name   |                    Hashtags                     |
++---------------------+----------------+-------------------------------------------------+
+| 663858238757199873  | FinishLine     | {&quot;indices&quot;:[116,132],&quot;text&quot;:&quot;TheFundamentals&quot;}  |
+| 663858343581237248  | antena3com     | {&quot;indices&quot;:[82,97],&quot;text&quot;:&quot;MarDePlástico8&quot;}     |
+| 663858351978078208  | tacobell       | {&quot;indices&quot;:[12,28],&quot;text&quot;:&quot;TacoEmojiEngine&quot;}    |
+| 663858351990697984  | tacobell       | {&quot;indices&quot;:[14,30],&quot;text&quot;:&quot;TacoEmojiEngine&quot;}    |
+| 663858553329815553  | CollegeHumor   | {&quot;indices&quot;:[0,14],&quot;text&quot;:&quot;TheCrunchBowl&quot;}       |
+| 663858746251042816  | tacobell       | {&quot;indices&quot;:[12,28],&quot;text&quot;:&quot;TacoEmojiEngine&quot;}    |
+| 663859039831486465  | VctorClavijo   | {&quot;indices&quot;:[14,23],&quot;text&quot;:&quot;Carlos10&quot;}           |
+| 663859115358158848  | FarnamHorse    | {&quot;indices&quot;:[0,11],&quot;text&quot;:&quot;DidYouKnow&quot;}          |
+| 663859161503928320  | vpelham        | {&quot;indices&quot;:[20,29],&quot;text&quot;:&quot;feminist&quot;}           |
+| 663859161503928320  | vpelham        | {&quot;indices&quot;:[127,136],&quot;text&quot;:&quot;feminism&quot;}         |
+| 663859312469651456  | AlPrimerToque  | {&quot;indices&quot;:[0,18],&quot;text&quot;:&quot;LorenzoEnOndaCero&quot;}   |
+| 663859425715834880  | NewsTalk770    | {&quot;indices&quot;:[82,91],&quot;text&quot;:&quot;yycroads&quot;}           |
+| 663859425715834880  | NewsTalk770    | {&quot;indices&quot;:[92,103],&quot;text&quot;:&quot;yyctraffic&quot;}        |
+| 663859471844810752  | BrentASJax     | {&quot;indices&quot;:[70,83],&quot;text&quot;:&quot;FirstAlertWX&quot;}       |
+| 663859530598514688  | simpsonwhnt    | {&quot;indices&quot;:[102,111],&quot;text&quot;:&quot;valleywx&quot;}         |
++---------------------+----------------+-------------------------------------------------+
+</code></pre>
+
+<p>You can probably guess where I’m heading by now. A <code>COUNT()</code> and <code>GROUP BY</code> on a table like this can give us the number
+hashtags in each tweet. So let’s make a temporary reference to this query’s output with Drill’s &lsquo;view&rsquo; functionality. To
+do this we switch to the local file system’s temporary workspace and then run a CREATE VIEW command:</p>
+
+<pre><code class="language-sql">&gt; USE dfs.tmp;
+&gt; CREATE VIEW hashtags AS SELECT tw.id `Tweet Id`, tw.`user`.screen_name `Screen Name`, FLATTEN(tw.entities.hashtags) `Hashtags` FROM dfs.`/path/to/tweets.small.json` tw WHERE tw.entities.hashtags[0].text IS NOT NULL AND tw.`user`.verified = true;
+</code></pre>
+
+<p>And now we’re ready to query our &lsquo;hashtags&rsquo; view to sort verified tweets by the number of hashtags.</p>
+
+<pre><code class="language-sql">  SELECT `Tweet Id`, `Screen Name`, COUNT(`Tweet Id`) `Num Hashtags`
+    FROM hashtags
+GROUP BY `Tweet Id`, `Screen Name`
+ORDER BY `Num Hashtags` DESC
+   LIMIT 15;
+</code></pre>
+
+<pre><code>+---------------------+------------------+---------------+
+|      Tweet Id       |   Screen Name    | Num Hashtags  |
++---------------------+------------------+---------------+
+| 663860369459384320  | SOFIALAMA        | 4             |
+| 663861480945664004  | ChrisMillerKUTV  | 3             |
+| 663861938103930880  | XboxFR           | 3             |
+| 663862705674133504  | sputnik_TR       | 2             |
+| 663862542079557633  | WHO              | 2             |
+| 663862743427076096  | ljcisneros       | 2             |
+| 663861338310053888  | joelcomm         | 2             |
+| 663859161503928320  | vpelham          | 2             |
+| 663861027948249088  | joemaalouftv     | 2             |
+| 663859425715834880  | NewsTalk770      | 2             |
+| 663861791303274497  | DezMandamentos   | 2             |
+| 663860684006952960  | RogerCookMLA     | 2             |
+| 663859799004581888  | DPostSports      | 1             |
+| 663859702535553024  | PrimerImpacto    | 1             |
+| 663859039831486465  | VctorClavijo     | 1             |
++---------------------+------------------+---------------+
+</code></pre>
+
+<p>Ta da!</p>
+
+<p>But views aren’t just for simplifying SQL statements. For instance, you could also employ a view to create a shortcut to
+a query that joins several different files and/or databases. And since views only store queries and not data, you can
+make a lot of them without worrying about consuming the amount of disk space associated with table creation.</p>
+
+<p>So to recap: In this post I&rsquo;ve showcased how to deal with complicated nested JSON data in Drill, while also
+demonstrating how a &lsquo;view&rsquo; can improve the flow and readability of your analysis.</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Querying dates using SQL in a JSON document</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Querying dates using SQL in a JSON document</h1>
+          <h4>by Nathan Griffith on 2015-12-03</h4>
+          <p>In this article we&rsquo;re going to use Apache Drill to bend TIME ITSELF to our every whim. Or wait, not TIME ITSELF. I
+meant, er&hellip; TIMESTAMPS. Don&rsquo;t worry&mdash;that&rsquo;s still pretty useful.</p>
+
+<p>So let&rsquo;s say I have the results of a Twitter search in raw JSON and would like to know the range of dates that the
+statuses span. For this we&rsquo;ll need the timestamp information, which is held in the &lsquo;created_at&rsquo; key of each object.</p>
+
+<p>Now take a look at my search results for the word &lsquo;squark.&rsquo; (Yes, that&rsquo;s a real word. You can Google it and learn
+some particle physics.) We&rsquo;ll first try to find the dates spanned by the results using this method:</p>
+
+<pre><code>&gt; SELECT MIN(t.created_at) FROM dfs.`/path/to/search.json` t;
++---------------------------------+
+|             EXPR$0              |
++---------------------------------+
+| Fri Nov 27 02:34:52 +0000 2015  |
++---------------------------------+
+</code></pre>
+
+<pre><code>&gt; SELECT MAX(t.created_at) FROM dfs.`/path/to/search.json` t;
++---------------------------------+
+|             EXPR$0              |
++---------------------------------+
+| Wed Nov 25 19:42:49 +0000 2015  |
++---------------------------------+
+</code></pre>
+
+<p>Well, the minimum date is later than the maximum date, so it&rsquo;s safe to say that didn&rsquo;t work. Here&rsquo;s the reason:
+&lsquo;created_at&rsquo; is being treated as a string typed variable and not as a timestamp. Fixing this is fairly straightforward,
+we&rsquo;ll just have to use the <code>TO_TIMESTAMP()</code> function to convert the type.</p>
+
+<p><code>TO_TIMESTAMP()</code> takes two arguments: the first one is the name of the column you&rsquo;d like to convert, and the second one
+is a string that describes the format of the date that you&rsquo;re converting (use this
+<a href="http://joda-time.sourceforge.net/apidocs/org/joda/time/format/DateTimeFormat.html">page</a> as a reference).</p>
+
+<p>So in my case I can convert my date strings to the timestamp type with these arguments:</p>
+
+<pre><code>TO_TIMESTAMP(t.created_at, 'EEE MMM dd HH:mm:ss +0000 yyyy')
+</code></pre>
+
+<p>And now let&rsquo;s try to find the first and last date again:</p>
+
+<pre><code>&gt; SELECT MIN(TO_TIMESTAMP(t.created_at, 'EEE MMM dd HH:mm:ss +0000 yyyy')) FROM
+&gt; dfs.`/path/to/search.json` t;
++------------------------+
+|         EXPR$0         |
++------------------------+
+| 2015-11-25 19:42:49.0  |
++------------------------+
+</code></pre>
+
+<pre><code>&gt; SELECT MAX(TO_TIMESTAMP(t.created_at, 'EEE MMM dd HH:mm:ss +0000 yyyy')) FROM
+&gt; dfs.`/path/to/search.json` t;
++------------------------+
+|         EXPR$0         |
++------------------------+
+| 2015-12-02 14:42:30.0  |
++------------------------+
+</code></pre>
+
+<p>Much better!</p>
+
+<p>Rigorously manipulating time data is the sort of fiddly work that can give even experienced technical types an anxious
+rash, so it&rsquo;s nice to know that Drill has your back when it comes to making date format conversions.</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Bootstrapping an interactive SQL environment on Amazon EMR</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Bootstrapping an interactive SQL environment on Amazon EMR</h1>
+          <h4>by Nathan Griffith on 2015-11-17</h4>
+          <p>Amazon&rsquo;s Elastic MapReduce (EMR) service is a great way to create on-demand Hadoop clusters for ad hoc data analysis.
+The web based interface for the service is simple to use, and at its most basic level creating an EMR cluster is as easy
+as specifying the number and type of machines to use. But you can also instruct each computer to execute something
+called a &lsquo;bootstrap action&rsquo; just before coming online. The contents of this script can direct the cluster to
+automatically prepare itself for data crunching operations that have dependencies which lie outside of the primary
+Hadoop toolset. In this post I&rsquo;ll show you how to use an EMR bootstrap action provided by Dremio to install Drill on
+each node in the cluster. As I&rsquo;ve discussed before, Drill is great for a lot of stuff, and it&rsquo;s a fast and easy way to
+get near-realtime access to your data via a SQL interface.</p>
+
+<p>Launching a new EMR cluster that comes with Drill pre-installed is almost identical to launching one without it. The
+only extra step is that you need to specify the location on Amazon S3 of a bootstrap action script. You can do this
+under the &ldquo;Bootstrap Actions&rdquo; heading of the EMR &ldquo;Advanced Options&rdquo; page for cluster creation (it&rsquo;s the second settings
+grouping from the bottom of the page). Just select &ldquo;Custom action&rdquo; from the dropdown list, press &ldquo;Configure and add&rdquo;,
+and then specify Dremio&rsquo;s script for installing Drill (hosted at s3://repo.dremio.com/aws/emr/bootstrapDrill.py) in the
+&ldquo;JAR location&rdquo; field.</p>
+
+<p>Once your cluster is up and ready, you should be able to log in and run <code>drill-conf</code> to start Drill&rsquo;s SQL prompt. Type
+<code>SELECT * FROM sys.drillbits;</code> and you&rsquo;ll see all of the available drillbit services on your cluster (one for each
+machine) listed like the following:</p>
+
+<pre><code>&gt; SELECT * FROM sys.drillbits;
++---------------------------------------------+------------+---------------+------------+----------+
+|                  hostname                   | user_port  | control_port  | data_port  | current  |
++---------------------------------------------+------------+---------------+------------+----------+
+| ip-172-31-23-93.us-west-2.compute.internal  | 31010      | 31011         | 31012      | true     |
+| ip-172-31-26-64.us-west-2.compute.internal  | 31010      | 31011         | 31012      | false    |
+| ip-172-31-23-94.us-west-2.compute.internal  | 31010      | 31011         | 31012      | false    |
++---------------------------------------------+------------+---------------+------------+----------+
+</code></pre>
+
+<p>Since this script comes with the HDFS plugin for Drill pre-installed, you can start querying Hadoop data right away with
+commands like <code>SELECT * FROM hdfs.`/data/userdata.json`</code>.</p>
+
+<p>You can also enable access to files stored on Amazon S3 by specifying the name of an S3 bucket (without a leading
+&ldquo;s3://&ldquo;) in the &ldquo;Optional arguments&rdquo; box of the &ldquo;Add Bootstrap Action&rdquo; dialog of the EMR web GUI. The name for this
+plugin will be &ldquo;s3,&rdquo; so you can query a file in the bucket you specified with just <code>SELECT * FROM s3.`myfile.csv`</code>.</p>
+
+<p>So if you&rsquo;re curious about using Drill in a cluster, pairing Amazon&rsquo;s EMR service with this bootstrap action could be a
+great place to start.</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

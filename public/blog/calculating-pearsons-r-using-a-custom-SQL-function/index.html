@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Calculating Pearson&#39;s r using a custom SQL function</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Calculating Pearson&#39;s r using a custom SQL function</h1>
+          <h4>by Nathan Griffith on 2016-02-10</h4>
+          <script type="text/javascript"
+ src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+<p>Lately I&rsquo;ve written a lot of custom functions to assist me in my example Drill analyses, but they&rsquo;ve all been of the
+same fundamental type: They take one or more columns of a single row and process them into a single output. The <a href="https://drill.apache.org/docs/develop-custom-functions-introduction/">Drill
+documentation</a> calls these &ldquo;simple&rdquo; functions.
+However there&rsquo;s another class of functions lurking out there&mdash;ones that can accept <em>many</em> rows of data as input. We
+call them &ldquo;aggregate&rdquo; functions.</p>
+
+<p>If you&rsquo;re an experienced user of SQL, you&rsquo;re already familiar with a few very common aggregate functions like <code>COUNT()</code>
+and <code>SUM()</code>, but you&rsquo;ve probably never written one of your own. Today we&rsquo;re going to change that!</p>
+
+<p>As I&rsquo;ve discussed in previous articles Drill already has some built-in statistics functions, but the goal of this post
+will be to expand those capabilities even further by implementing an aggregate function to calculate a value called
+Pearson&rsquo;s <em>r</em>. Values for <em>r</em> vary from +1 to -1, and indicate the degree to which two variables are linearly correlated
+or anti-correlated, respectively. An <em>r</em> value at or near 0 indicates that there is no linear relationship between the
+two sets of data points.</p>
+
+<p>After looking on Wikipedia, the most Drill-friendly equation for Pearson&rsquo;s <em>r</em> is:</p>
+
+<p>$$ r = \frac{n \sum x_i y_i - \sum x_i \sum y_i}{ \sqrt{n \sum x_i^2 - \left( \sum x_i \right)^2} \sqrt{n \sum y_i^2 -
+\left( \sum y_i \right)^2}} $$</p>
+
+<p>where \( x_i \) and \( y_i \) are our data points, and \( n \) is the total number of them.</p>
+
+<p>Once you&rsquo;ve got a Maven project started for your Drill UDF (a guide is available in the &ldquo;Downloading Maven and starting
+a new project&rdquo; section of <a href="http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/">this
+article</a>), take a look at the source
+for our Pearson&rsquo;s <em>r</em> function:</p>
+
+<pre><code class="language-java">package com.yourgroupidentifier.udf;
+
+import org.apache.drill.exec.expr.DrillAggFunc;
+import org.apache.drill.exec.expr.holders.IntHolder;
+import org.apache.drill.exec.expr.holders.NullableFloat8Holder;
+import org.apache.drill.exec.expr.holders.Float8Holder;
+
+import org.apache.drill.exec.expr.annotations.FunctionTemplate;
+
+import org.apache.drill.exec.expr.annotations.Param;
+import org.apache.drill.exec.expr.annotations.Workspace;
+import org.apache.drill.exec.expr.annotations.Output;
+
+@FunctionTemplate(
+        name = &quot;pcorrelation&quot;,
+        scope = FunctionTemplate.FunctionScope.POINT_AGGREGATE,
+        nulls = FunctionTemplate.NullHandling.INTERNAL
+)
+
+public class PCorrelation implements DrillAggFunc {
+
+    @Param
+    NullableFloat8Holder xInput;
+
+    @Param
+    NullableFloat8Holder yInput;
+
+    @Workspace
+    IntHolder numValues;
+
+    @Workspace
+    Float8Holder xSum;
+
+    @Workspace
+    Float8Holder ySum;
+
+    @Workspace
+    Float8Holder xSqSum;
+
+    @Workspace
+    Float8Holder ySqSum;
+
+    @Workspace
+    Float8Holder xySum;
+
+    @Output
+    Float8Holder output;
+
+    public void setup() {
+        // Initialize values
+        numValues.value = 0;
+        xSum.value = 0;
+        ySum.value = 0;
+        xSqSum.value = 0;
+        ySqSum.value = 0;
+        xySum.value = 0;
+    }
+
+    public void reset() {
+        // Initialize values
+        numValues.value = 0;
+        xSum.value = 0;
+        ySum.value = 0;
+        xSqSum.value = 0;
+        ySqSum.value = 0;
+        xySum.value = 0;
+    }
+
+    public void add() {
+
+        // Only proceed if both floats aren't nulls
+        if( (xInput.isSet == 1) || (yInput.isSet == 1) ) {
+
+            numValues.value++;
+
+            xSum.value += xInput.value;
+            ySum.value += yInput.value;
+
+            xSqSum.value += xInput.value * xInput.value;
+            ySqSum.value += yInput.value * yInput.value;
+
+            xySum.value += xInput.value * yInput.value;
+        }
+
+    }
+
+    public void output() {
+
+        float n = numValues.value;
+
+        double x = xSum.value;
+        double y = ySum.value;
+
+        double x2 = xSqSum.value;
+        double y2 = ySqSum.value;
+
+        double xy = xySum.value;
+
+        output.value = (n*xy - x*y)/(Math.sqrt(n*x2 - x*x)*Math.sqrt(n*y2 - y*y));
+    }
+}
+</code></pre>
+
+<p>Yes, that&rsquo;s a chunk of code&mdash;but it&rsquo;s mostly this long because it takes a lot of variables to accomplish the <em>r</em>
+calculation. Anyway, let&rsquo;s talk about some differences between this aggregate function and the simple ones we&rsquo;ve been
+writing up until now.</p>
+
+<p>First, up in the function template the scope changes from <code>SIMPLE</code> to <code>POINT_AGGREGATE</code>, while the null handling is set
+to <code>INTERNAL</code> instead of <code>NULL_IF_NULL</code>. This is because aggregate functions need to determine on their own how to
+process null inputs, rather than let Drill handle it for them as we can do for most simple functions. You&rsquo;ll also notice
+a new annotation, <code>@Workspace</code>, which is used before variables that assist in the calculation of the result as the
+function moves through each row.</p>
+
+<p>Another obvious difference is that aggregate functions implement a different set of methods than simple ones. The
+<code>setup()</code> method remains the same, but <code>output()</code> takes the place of <code>eval()</code>. For each row that&rsquo;s processed <code>add()</code> is
+called, and <code>reset()</code> is used to determine what the function does when it hits a new set of rows.</p>
+
+<p>In the next article, I&rsquo;ll take this new <code>PCORRELATION()</code> function out for a spin on some vehicle data from the EPA.</p>
+
+<p>(OK, yes, pun very much intended that time.)</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/join/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/join/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Using a SQL JOIN on two CSV files</title>
+      <link>/kstirman.github.io/bookshelf/blog/using-a-SQL-join-on-two-CSV-files/</link>
+      <pubDate>Tue, 19 Jan 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/using-a-SQL-join-on-two-CSV-files/</guid>
+      <description>&lt;p&gt;One of Drill&amp;rsquo;s great strengths is its ability to unite sets of information found in different places. In today&amp;rsquo;s article
+I&amp;rsquo;ll provide a quick example of this functionality by showing you how to you use Drill to quickly improve the interface
+to some found data.&lt;/p&gt;
+
+&lt;p&gt;We&amp;rsquo;ll start with the interesting but strangely formatted business-centered census data that we used in the &lt;a href=&#34;http://www.dremio.com/blog/converting-csv-file-data-to-kudu-storage/&#34;&gt;last
+post&lt;/a&gt; (available on
+&lt;a href=&#34;https://www.census.gov/econ/cbp/download/&#34;&gt;this site&lt;/a&gt; as a 14.3 MB zip file). As you&amp;rsquo;ll recall, our command to query
+the state, county, and industry codes, along with the number of establishments, yielded results in the following format:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;+-----------+----------+---------+------+
+| fipstate  | fipscty  |  naics  | est  |
++-----------+----------+---------+------+
+| 55        | 107      | 321113  | 1    |
+| 48        | 185      | 51213/  | 1    |
+| 39        | 135      | 42491/  | 6    |
+| 04        | 027      | 4411//  | 30   |
+| 08        | 085      | 541870  | 1    |
+| 26        | 061      | 51----  | 17   |
+| 28        | 049      | 519///  | 3    |
+| 48        | 139      | 48849/  | 3    |
+| 22        | 073      | 4853//  | 3    |
+| 48        | 139      | 424910  | 10   |
++-----------+----------+---------+------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;It&amp;rsquo;s great to have data with this level of granularity, but the FIPS codes that the file uses to identify the state and
+county are far from intuitive. Thankfully we can use Drill in combination with this &lt;a href=&#34;https://github.com/hadley/data-counties/blob/master/county-fips.csv&#34;&gt;lovely CSV
+file&lt;/a&gt; from Github user &amp;lsquo;hadley&amp;rsquo; to make the data
+more user-friendly. (Remember to rename both files as &amp;lsquo;.csvh&amp;rsquo; so Drill knows to pick up the column names!)&lt;/p&gt;
+
+&lt;p&gt;Because Drill effectively treats each file as a separate table, we can gain access to human readable state and county
+names by performing an SQL JOIN across the files.&lt;/p&gt;
+
+&lt;p&gt;That handy file from Github has a format like&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;+-----------------------+--------+--------------+-------------+
+|        county         | state  | county_fips  | state_fips  |
++-----------------------+--------+--------------+-------------+
+| Aleutians East        | AK     | 13           | 2           |
+| Aleutians West        | AK     | 16           | 2           |
+| Anchorage             | AK     | 20           | 2           |
+| Bethel                | AK     | 50           | 2           |
+| Bristol Bay           | AK     | 60           | 2           |
+| Denali                | AK     | 68           | 2           |
+| Dillingham            | AK     | 70           | 2           |
+| Fairbanks North Star  | AK     | 90           | 2           |
+| Haines                | AK     | 100          | 2           |
+| Juneau                | AK     | 110          | 2           |
++-----------------------+--------+--------------+-------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;so a simple query that brings state and county names to the census data using a JOIN is:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;  SELECT t2.state, t2.county, SUM(CAST(t1.est AS INT)) `total establishments`
+    FROM dfs.`/path/to/cbp13co.csvh` t1
+    JOIN dfs.`/path/to/county-fips.csvh` t2
+      ON t1.fipstate = t2.state_fips
+     AND t1.fipscty = t2.county_fips
+GROUP BY t2.state, t2.county
+ORDER BY `total establishments`
+    DESC LIMIT 10;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Which, for the curious, produces the following output:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;+--------+--------------+-----------------------+
+| state  |    county    | total establishments  |
++--------+--------------+-----------------------+
+| TX     | Harris       | 571756                |
+| TX     | Dallas       | 374670                |
+| NY     | Suffolk      | 291970                |
+| TX     | Tarrant      | 232484                |
+| MI     | Oakland      | 230154                |
+| GA     | Fulton       | 203028                |
+| MI     | Wayne        | 190806                |
+| NY     | Westchester  | 189820                |
+| TX     | Travis       | 186236                |
+| MO     | St. Louis    | 184326                |
++--------+--------------+-----------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Cool! (And, no, I have no idea why Harris county, Texas is apparently the business capitol of the United States.)&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

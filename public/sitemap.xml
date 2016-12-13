@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/</loc>
+    <lastmod>2016-06-08T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/bi-on-big-data-what-are-your-options/</loc>
+    <lastmod>2016-06-08T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/introducing-apache-arrow-columnar-in-memory-analytics/</loc>
+    <lastmod>2016-02-17T16:34:36-08:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/parsing-epa-vehicle-data-for-linear-correlations-in-mpg-ratings/</loc>
+    <lastmod>2016-02-11T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/what-can-ligo-see-lets-look-at-gravitational-waves-with-sql/</loc>
+    <lastmod>2016-02-11T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/calculating-pearsons-r-using-a-custom-SQL-function/</loc>
+    <lastmod>2016-02-10T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/managing-variable-type-nullability/</loc>
+    <lastmod>2016-02-09T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/smartest-and-dumbest-subreddits-as-judged-by-submission-title-readibility/</loc>
+    <lastmod>2016-02-06T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/querying-for-reading-level-with-a-simple-UDF/</loc>
+    <lastmod>2016-02-05T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/the-case-of-the-stolen-candy-hearts-advanced-date-parsing-in-sql/</loc>
+    <lastmod>2016-02-02T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/reddit-hates-george-bush-more-than-vladimir-putin/</loc>
+    <lastmod>2016-01-29T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/writing-a-custom-SQL-function-for-sentiment-analysis/</loc>
+    <lastmod>2016-01-28T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/securing-SQL-on-Hadoop-part-2-installing-and-configuring-Drill/</loc>
+    <lastmod>2016-01-25T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/securing-SQL-on-Hadoop-part-1-installing-CDH-and-Kerberos/</loc>
+    <lastmod>2016-01-22T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/Drill-plays-the-classics-querying-musical-compositions-with-SQL/</loc>
+    <lastmod>2016-01-21T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/using-a-SQL-join-on-two-CSV-files/</loc>
+    <lastmod>2016-01-19T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/SQL-on-Kudu-quickstart/</loc>
+    <lastmod>2016-01-13T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/old-and-busted-tesasing-formery-fashionable-websites-from-Reddit-data/</loc>
+    <lastmod>2016-01-03T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/predicting-international-space-station-solar-transits-using-built-in-SQL-math-functions/</loc>
+    <lastmod>2015-12-21T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/tuning-Parquet-file-performance/</loc>
+    <lastmod>2015-12-13T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/examining-US-radio-antenna-locations-with-Tableau-desktop-9/</loc>
+    <lastmod>2015-12-10T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/installing-Apache-Drill-on-Microsoft-Windows/</loc>
+    <lastmod>2015-12-08T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/performing-basic-statistics-operations-on-Twitter-data/</loc>
+    <lastmod>2015-12-03T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/querying-dates-using-SQL-in-a-JSON-document/</loc>
+    <lastmod>2015-12-03T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/white-mana-cards-are-cheap-and-stupid-querying-a-database-of-every-magic-card-ever-made/</loc>
+    <lastmod>2015-12-03T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/configuring-Drills-storage-plugins-with-the-rest-api/</loc>
+    <lastmod>2015-12-02T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/setting-up-an-SQL-interface-to-a-sharded-MongoDB/</loc>
+    <lastmod>2015-12-02T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/bless-this-mess-workng-with-complicated-JSON-structure-in-SQL/</loc>
+    <lastmod>2015-12-01T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/SQL-and-Parquet-a-simple-demo/</loc>
+    <lastmod>2015-12-01T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/finding-corrupt-JSON-records-in-MongoDB/</loc>
+    <lastmod>2015-11-30T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/SQL-queries-on-CSV-files-with-column-headers/</loc>
+    <lastmod>2015-11-23T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/bootstrapping-an-interactive-SQL-environment-on-Amazon-EMR/</loc>
+    <lastmod>2015-11-17T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/how-to-query-S3-data-using-Amazons-S3a-library/</loc>
+    <lastmod>2015-11-16T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/querying-google-analytics-JSON-with-a-custom-SQL-function/</loc>
+    <lastmod>2015-10-30T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/using-SQL-to-interface-with-Google-Analytics-data-stored-on-Amazon-S3/</loc>
+    <lastmod>2015-10-20T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/running-SQL-queries-on-CSV-files-using-Apache-Drill/</loc>
+    <lastmod>2015-10-13T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/blog/bringing-SQL-to-MongoDB-with-Apache-Drill/</loc>
+    <lastmod>2015-09-20T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/kstirman.github.io/bookshelf/jobs/</loc>
+  </url>
+  
+</urlset>

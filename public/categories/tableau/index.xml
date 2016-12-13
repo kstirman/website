@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/tableau/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/tableau/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>BI on Big Data: What are your options?</title>
+      <link>/kstirman.github.io/bookshelf/blog/bi-on-big-data-what-are-your-options/</link>
+      <pubDate>Wed, 08 Jun 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/bi-on-big-data-what-are-your-options/</guid>
+      <description>&lt;p&gt;Deciding what combination of technologies will yield the best &amp;lsquo;BI on Big Data&amp;rsquo; experience can be a major challenge for
+data professionals. This presentation, given by Dremio CEO Tomer Shiran at Strata + Hadoop World London, aims to shed
+some light on some of the solutions that are available in the space.&lt;/p&gt;
+
+&lt;p&gt;In this session, three general classes &amp;lsquo;BI on Big Data&amp;rsquo; solutions were investigated:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;ETL to Data Warehouse (custom scripts, Informatica, Talend, Pentaho)&lt;/li&gt;
+&lt;li&gt;Monolithic All-in-one Solutions (Datameer, Platfora, Zoomdata)&lt;/li&gt;
+&lt;li&gt;SQL-on-Big-Data (Apache Drill, Apache Impala, Presto, Hive, Spark, Kylin, AtScale)&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;The following slides contain architectural descriptions, pros and cons, and a needs-based heuristic to assist those
+trying to settle on a BI on Big Data solution.&lt;/p&gt;
+
+&lt;p&gt;&lt;br&gt;&lt;/p&gt;
+
+&lt;script async class=&#34;speakerdeck-embed&#34; data-id=&#34;eba9639391314e049d62c33acfbe9323&#34; data-ratio=&#34;1.77777777777778&#34; src=&#34;//speakerdeck.com/assets/embed.js&#34;&gt;&lt;/script&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Examining U.S. radio antenna locations with Tableau Desktop 9</title>
+      <link>/kstirman.github.io/bookshelf/blog/examining-US-radio-antenna-locations-with-Tableau-desktop-9/</link>
+      <pubDate>Thu, 10 Dec 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/examining-US-radio-antenna-locations-with-Tableau-desktop-9/</guid>
+      <description>&lt;p&gt;For today&amp;rsquo;s demo I&amp;rsquo;m going to parse a data.gov file that contains U.S. radio tower locations into a cool map figure.
+I&amp;rsquo;ll be using Apache Drill to handle reading in and manipulating the geographic coordinate fields in the file, and
+&lt;a href=&#34;http://www.tableau.com/&#34;&gt;Tableau Desktop 9&lt;/a&gt; to provide an easy way to generate a map based on the data.&lt;/p&gt;
+
+&lt;p&gt;Attaching Tableau to Drill data in Microsoft Windows is pretty easy. Assuming you already have Drill (see &lt;a href=&#34;http://www.dremio.com/blog/installing-apache-drill-on-microsoft-windows/&#34;&gt;this
+article&lt;/a&gt;) and Tableau installed, you just need
+to download and install &lt;a href=&#34;http://package.mapr.com/tools/MapR-ODBC/MapR_Drill/MapRDrill_odbc_v1.2.0.1000/&#34;&gt;this ODBC
+driver&lt;/a&gt; from MapR (choose the 64-bit
+.msi file). That&amp;rsquo;s all you&amp;rsquo;ll need to be able to follow along with this demo, so let&amp;rsquo;s turn our attention back to the
+data.&lt;/p&gt;
+
+&lt;p&gt;Go ahead and download the zipped antenna files located on &lt;a href=&#34;https://catalog.data.gov/dataset/antenna-structure-registration-asr-fcc-2000&#34;&gt;this
+site&lt;/a&gt;. Once they&amp;rsquo;re unzipped, rename the
+&amp;lsquo;CO.dat&amp;rsquo; file to &amp;lsquo;CO.tbl&amp;rsquo; (be sure to turn on &amp;lsquo;File name extensions&amp;rsquo; under &amp;lsquo;View&amp;rsquo;). This renaming tells Drill to use the
+pipe symbol &amp;lsquo;|&amp;rsquo; as a delimiter for columns in the file.&lt;/p&gt;
+
+&lt;p&gt;So let&amp;rsquo;s take a look at the data:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT * FROM dfs.`C:\Path\To\r_tower\CO.tbl` LIMIT 10;
++-----------------------------------------------------------------------------------------------------------------------+
+|                                                        columns                                                        |
++-----------------------------------------------------------------------------------------------------------------------+
+| [&amp;quot;CO&amp;quot;,&amp;quot;REG&amp;quot;,&amp;quot;A0925026&amp;quot;,&amp;quot;1293612&amp;quot;,&amp;quot;2693131&amp;quot;,&amp;quot;T&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;\r&amp;quot;]                                 |
+| [&amp;quot;CO&amp;quot;,&amp;quot;REG&amp;quot;,&amp;quot;A0971560&amp;quot;,&amp;quot;1295891&amp;quot;,&amp;quot;2695410&amp;quot;,&amp;quot;T&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;\r&amp;quot;]                                 |
+| [&amp;quot;CO&amp;quot;,&amp;quot;REG&amp;quot;,&amp;quot;A0977407&amp;quot;,&amp;quot;1296672&amp;quot;,&amp;quot;2696191&amp;quot;,&amp;quot;T&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;\r&amp;quot;]                                 |
+| [&amp;quot;CO&amp;quot;,&amp;quot;REG&amp;quot;,&amp;quot;A0980840&amp;quot;,&amp;quot;1297184&amp;quot;,&amp;quot;2696703&amp;quot;,&amp;quot;T&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;\r&amp;quot;]                                 |
+| [&amp;quot;CO&amp;quot;,&amp;quot;REG&amp;quot;,&amp;quot;A0000039&amp;quot;,&amp;quot;1000019&amp;quot;,&amp;quot;96973&amp;quot;,&amp;quot;T&amp;quot;,&amp;quot;41&amp;quot;,&amp;quot;9&amp;quot;,&amp;quot;58.0&amp;quot;,&amp;quot;N&amp;quot;,&amp;quot;148198.0&amp;quot;,&amp;quot;81&amp;quot;,&amp;quot;15&amp;quot;,&amp;quot;23.0&amp;quot;,&amp;quot;W&amp;quot;,&amp;quot;292523.0&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;\r&amp;quot;]  |
+| [&amp;quot;CO&amp;quot;,&amp;quot;REG&amp;quot;,&amp;quot;A0000069&amp;quot;,&amp;quot;1000042&amp;quot;,&amp;quot;96980&amp;quot;,&amp;quot;T&amp;quot;,&amp;quot;32&amp;quot;,&amp;quot;40&amp;quot;,&amp;quot;31.0&amp;quot;,&amp;quot;N&amp;quot;,&amp;quot;117631.0&amp;quot;,&amp;quot;97&amp;quot;,&amp;quot;8&amp;quot;,&amp;quot;29.0&amp;quot;,&amp;quot;W&amp;quot;,&amp;quot;349709.0&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;\r&amp;quot;]  |
+| [&amp;quot;CO&amp;quot;,&amp;quot;REG&amp;quot;,&amp;quot;A0000072&amp;quot;,&amp;quot;1000044&amp;quot;,&amp;quot;96982&amp;quot;,&amp;quot;T&amp;quot;,&amp;quot;32&amp;quot;,&amp;quot;53&amp;quot;,&amp;quot;2.0&amp;quot;,&amp;quot;N&amp;quot;,&amp;quot;118382.0&amp;quot;,&amp;quot;96&amp;quot;,&amp;quot;48&amp;quot;,&amp;quot;34.0&amp;quot;,&amp;quot;W&amp;quot;,&amp;quot;348514.0&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;\r&amp;quot;]  |
+| [&amp;quot;CO&amp;quot;,&amp;quot;REG&amp;quot;,&amp;quot;A0000073&amp;quot;,&amp;quot;1000045&amp;quot;,&amp;quot;96983&amp;quot;,&amp;quot;T&amp;quot;,&amp;quot;32&amp;quot;,&amp;quot;57&amp;quot;,&amp;quot;6.0&amp;quot;,&amp;quot;N&amp;quot;,&amp;quot;118626.0&amp;quot;,&amp;quot;97&amp;quot;,&amp;quot;3&amp;quot;,&amp;quot;52.0&amp;quot;,&amp;quot;W&amp;quot;,&amp;quot;349432.0&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;\r&amp;quot;]   |
+| [&amp;quot;CO&amp;quot;,&amp;quot;REG&amp;quot;,&amp;quot;A0000097&amp;quot;,&amp;quot;1000064&amp;quot;,&amp;quot;96988&amp;quot;,&amp;quot;T&amp;quot;,&amp;quot;33&amp;quot;,&amp;quot;36&amp;quot;,&amp;quot;0.0&amp;quot;,&amp;quot;N&amp;quot;,&amp;quot;120960.0&amp;quot;,&amp;quot;85&amp;quot;,&amp;quot;50&amp;quot;,&amp;quot;0.0&amp;quot;,&amp;quot;W&amp;quot;,&amp;quot;309000.0&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;\r&amp;quot;]   |
+| [&amp;quot;CO&amp;quot;,&amp;quot;REG&amp;quot;,&amp;quot;A0000122&amp;quot;,&amp;quot;1000086&amp;quot;,&amp;quot;96991&amp;quot;,&amp;quot;T&amp;quot;,&amp;quot;25&amp;quot;,&amp;quot;51&amp;quot;,&amp;quot;59.0&amp;quot;,&amp;quot;N&amp;quot;,&amp;quot;93119.0&amp;quot;,&amp;quot;80&amp;quot;,&amp;quot;17&amp;quot;,&amp;quot;6.0&amp;quot;,&amp;quot;W&amp;quot;,&amp;quot;289026.0&amp;quot;,&amp;quot;&amp;quot;,&amp;quot;\r&amp;quot;]   |
++-----------------------------------------------------------------------------------------------------------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Looks like we have a couple quirks to do deal with: 1.) the latitude and longitude information is spread across several
+columns and represented in sexigesimal format (see &lt;a href=&#34;https://en.wikipedia.org/wiki/Degree_(angle)#Subdivisions&#34;&gt;this Wiki
+link&lt;/a&gt;), and 2.) at least some geographic fields are blank, so
+we&amp;rsquo;ll need to account for that when we process the file.&lt;/p&gt;
+
+&lt;p&gt;After some thought (and trial and error), I came up with following &amp;lsquo;antenna&amp;rsquo; view to hold the geo data that we want to
+access from Tableau:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW antennas AS
+     SELECT CAST(columns[6] AS FLOAT)+(CAST(columns[7] AS FLOAT)/60)+(CAST(columns[8] AS FLOAT)/3600) lat,
+            -1*(CAST(columns[11] AS FLOAT)+(CAST(columns[12] AS FLOAT)/60)+(CAST(columns[13] AS FLOAT)/3600)) long
+       FROM dfs.`C:\Path\To\r_tower\CO.tbl`
+      WHERE LENGTH(columns[6]) &amp;gt; 0;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;&lt;em&gt;But please note:&lt;/em&gt; Before you issue this command you should switch to a writable schema by entering:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;USE dfs.tmp;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now that the view is created, we can focus on connecting Tableau to Drill and loading in the data. With Drill still
+running in a Command Prompt window, launch Tableau and select &amp;ldquo;More Servers&amp;hellip;&amp;rdquo; from the &amp;ldquo;Connect&amp;rdquo; panel on the
+left-hand side. Then click &amp;ldquo;Other Databases (ODBC).&amp;rdquo; In the dialog box that appears, select &amp;ldquo;MapR ODBC Driver for Drill
+DSN&amp;rdquo; next to the &amp;ldquo;DSN&amp;rdquo; radio button. Now click &amp;ldquo;Connect&amp;rdquo;, then &amp;ldquo;OK&amp;rdquo; in the new window that pops up, followed by &amp;ldquo;OK&amp;rdquo; in
+the original window.&lt;/p&gt;
+
+&lt;p&gt;With the connection to Drill completed, we can start hunting for our data. Type &amp;lsquo;dfs.tmp&amp;rsquo; into the &amp;lsquo;Schema&amp;rsquo; dropdown on
+the left and then select it. Now do the same for the Table dropdown below it, but this time type in the name of our
+view, &amp;ldquo;antennas.&amp;rdquo; Now drag the &amp;lsquo;antennas&amp;rsquo; table that appears below into the big blank space that says &amp;lsquo;Drag tables
+here.&amp;rsquo; Now it&amp;rsquo;s time to tell Tableau that &amp;lsquo;Long&amp;rsquo; entries are actually &amp;lsquo;longitude,&amp;rsquo; so click the hash symbol next to the
+label down below and select &amp;ldquo;Longitude&amp;rdquo; from the &amp;ldquo;Geographic Role&amp;rdquo; submenu. To begin making our map figure, click &amp;ldquo;Sheet
+1&amp;rdquo; in the lower left of the window.&lt;/p&gt;
+
+&lt;p&gt;On this screen drag &amp;ldquo;Lat&amp;rdquo; from under &amp;ldquo;Measures&amp;rdquo; on the left to &amp;ldquo;Rows&amp;rdquo; up top, and then perform a similar operation for
+&amp;ldquo;Long&amp;rdquo; and &amp;ldquo;Columns.&amp;rdquo; Now hit the small down-arrow next to the newly created row and column entries of &amp;lsquo;AVG(Lat)&amp;rsquo; and
+&amp;lsquo;AVG(Long),&amp;rsquo; changing their types from &amp;lsquo;Measure (Average)&amp;rsquo; to &amp;lsquo;Dimension.&amp;rsquo; And that&amp;rsquo;s it! You should now be looking at a
+map of antenna locations in the United States that you can zoom and pan.&lt;/p&gt;
+
+&lt;p&gt;&lt;br&gt;
+&lt;br&gt;
+&lt;p style=&#34;text-align: center;&#34;&gt;
+&lt;img style=&#34;max-width: 100%;&#34; src=&#34;kstirman.github.io/bookshelf/img/us_radio.png&#34;&gt;
+&lt;/p&gt;
+&lt;p style=&#34;text-align: center; font-style: italic;&#34;&gt;Locations of radio towers within the continental United States.&lt;/p&gt;
+&lt;br&gt;
+&lt;br&gt;&lt;/p&gt;
+
+&lt;p&gt;Pretty neat! This plot definitely explains some of the issues I had with cell coverage last time I drove across the
+Western states.&lt;/p&gt;
+
+&lt;p&gt;Even though this is a simple demo, you can really see how using Drill to process data and Tableau to visualize it plays
+to the strengths of both pieces of software. It&amp;rsquo;s a potent combination, and one you should definitely look into using if
+you&amp;rsquo;re doing analytic work.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

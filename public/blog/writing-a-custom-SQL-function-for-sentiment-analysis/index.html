@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Writing a custom SQL function for sentiment analysis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Writing a custom SQL function for sentiment analysis</h1>
+          <h4>by Nathan Griffith on 2016-01-28</h4>
+          
+
+<p>In the world of data analytics a &lsquo;sentiment analysis&rsquo; is any technique that attempts to represent the feelings of users
+in a somewhat quantitative way. Implementations of this idea vary, but one of the simplest ones involves giving
+individual words a numeric score according to the strength of the positive or negative the emotions that they elicit.
+For instance we might assign a score of -2.3 to the word &lsquo;disappointment&rsquo; and a score of 1.8 to &lsquo;lighthearted.&rsquo;</p>
+
+<p>In today&rsquo;s article I&rsquo;m going to demonstrate that writing a custom SQL function (also known as a user defined function,
+or UDF) that performs a sentiment analysis is a fairly straightforward task. The SQL platform we&rsquo;ll be using for this
+project is Apache Drill; A software capable of querying <em>many</em> different types of data stores that also allows for the
+creation of custom functions written in the Java programming language.</p>
+
+<p>This isn&rsquo;t the first time I&rsquo;ve written about creating a UDF for Drill, and readers looking for a richer set of
+information about UDF programming may want to refer to <a href="http://www.dremio.com/blog/querying-google-analytics-json-with-a-custom-sql-function/">this earlier
+article</a>.</p>
+
+<h2 id="downloading-maven-and-starting-a-new-project">Downloading Maven and starting a new project</h2>
+
+<p>Just as before, we&rsquo;ll want to start by downloading and installing Apache Maven (<a href="https://maven.apache.org/download.cgi">available
+here</a>), which will be responsible for managing and building our Java project:</p>
+
+<pre><code>$ tar xzvf apache-maven-3.3.9-bin.tar.gz
+$ mv apache-maven-3.3.9 apache-maven
+</code></pre>
+
+<p>And since you&rsquo;ll probably be using it fairly frequently it might be nice to put the Maven binary in the PATH environment
+variable, so add this line to your <code>.bashrc</code> file:</p>
+
+<pre><code>export PATH=$PATH:~/apache-maven/bin
+</code></pre>
+
+<p>Now go to whatever directory you&rsquo;d like to store your UDFs in and issue this Maven command to create a new project for
+our sentiment analyzer called &lsquo;simplesentiment&rsquo;:</p>
+
+<pre><code>$ mvn archetype:generate -DgroupId=com.dremio.app -DartifactId=simplesentiment -DinteractiveMode=false
+</code></pre>
+
+<p>Because our UDF relies on Apache Drill, we&rsquo;ll need to add a couple things to the project&rsquo;s <code>pom.xml</code> configuration file.
+The first should go within the <code>&lt;dependencies&gt;</code> tag:</p>
+
+<pre><code>&lt;dependency&gt;
+  &lt;groupId&gt;org.apache.drill.exec&lt;/groupId&gt;
+  &lt;artifactId&gt;drill-java-exec&lt;/artifactId&gt;
+  &lt;version&gt;1.4.0&lt;/version&gt;
+&lt;/dependency&gt;
+</code></pre>
+
+<p>and the next should go inside the outermost tag called <code>&lt;project&gt;</code>:</p>
+
+<pre><code>&lt;build&gt;
+  &lt;plugins&gt;
+    &lt;plugin&gt;
+      &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+      &lt;artifactId&gt;maven-source-plugin&lt;/artifactId&gt;
+      &lt;version&gt;2.4&lt;/version&gt;
+      &lt;executions&gt;
+        &lt;execution&gt;
+          &lt;id&gt;attach-sources&lt;/id&gt;
+          &lt;phase&gt;package&lt;/phase&gt;
+          &lt;goals&gt;
+            &lt;goal&gt;jar-no-fork&lt;/goal&gt;
+          &lt;/goals&gt;
+        &lt;/execution&gt;
+      &lt;/executions&gt;
+    &lt;/plugin&gt;
+  &lt;/plugins&gt;
+&lt;/build&gt;
+</code></pre>
+
+<p>Finally we need to make a <code>./src/main/resources/drill-module.conf</code> file for the project (you&rsquo;ll probably need to create
+the &lsquo;resources&rsquo; directory, so go ahead and do that). This file should have these contents:</p>
+
+<pre><code>drill {
+  classpath.scanning {
+    packages : ${?drill.classpath.scanning.packages} [
+      com.yourgroupidentifier.udf
+    ]
+  }
+}
+</code></pre>
+
+<p>Where <code>com.yourgroupidentifier.udf</code> should be the same name as the <code>package</code> specified in the Java files listed in the
+next section.</p>
+
+<h2 id="sentiment-analysis-udf-source-code">Sentiment analysis UDF source code</h2>
+
+<p>The sentiment analyzer in my UDF follows the simple algorithm that I described earlier, with the values for words
+provided by <a href="https://github.com/cjhutto/vaderSentiment/blob/master/build/lib/vaderSentiment/vader_sentiment_lexicon.txt">this
+file</a>
+(<code>vader_sentiment_lexicon.txt</code>) available on Github from user &lsquo;cjhutto.&rsquo;</p>
+
+<p>Because Drill is picky about the format of a UDF class, this custom function had to be expressed in two different source
+files: one to define all the function&rsquo;s operations, and another for a simple class to hold the dictionary that
+translates words to numeric sentiment values. For this project, these files will be located in the project&rsquo;s
+<code>main/java/com/yourgroupidentifier/udf</code> directory.</p>
+
+<p>The first file, <code>simpleSent.java</code> looks like:</p>
+
+<pre><code class="language-java">package com.yourgroupidentifier.udf;
+
+import org.apache.drill.exec.expr.DrillSimpleFunc;
+import org.apache.drill.exec.expr.holders.Float8Holder;
+import org.apache.drill.exec.expr.holders.NullableVarCharHolder;
+
+import org.apache.drill.exec.expr.annotations.FunctionTemplate;
+import org.apache.drill.exec.expr.annotations.Output;
+import org.apache.drill.exec.expr.annotations.Param;
+
+@FunctionTemplate(
+        name = &quot;simplesent&quot;,
+        scope = FunctionTemplate.FunctionScope.SIMPLE,
+        nulls = FunctionTemplate.NullHandling.NULL_IF_NULL
+)
+
+public class simpleSent implements DrillSimpleFunc {
+
+    // The input to the function---almost certainly a text field
+    @Param
+    NullableVarCharHolder input;
+
+    // The output of the function---just a number
+    @Output
+    Float8Holder out;
+
+    public void setup() {
+
+        // Initialize object that holds dictionary
+        new com.yourgroupidentifier.udf.dictHolder();
+
+        // Open the sentiment values file
+        try {
+            java.io.FileReader fileReader = new java.io.FileReader(&quot;/path/to/vader_sentiment_lexicon.txt&quot;);
+            java.io.BufferedReader bufferedReader = new java.io.BufferedReader(fileReader);
+
+            String currLine;
+
+            // Read each line
+            try {
+                while ((currLine = bufferedReader.readLine()) != null) {
+                    String[] splitLine = currLine.split(&quot;\\s+&quot;);
+
+                    String currWord = splitLine[0];
+                    Double currValue;
+                    try {
+                        currValue = Double.parseDouble(splitLine[1]);
+                    }
+                    catch (java.lang.NumberFormatException numberEx) {
+                        currValue = 0.0;
+                    }
+
+                    // Put sentiment value in dictionary
+                    com.yourgroupidentifier.udf.dictHolder.sentiDict.put(currWord, currValue);
+                }
+            }
+            catch(java.io.IOException ioEx) {
+                System.out.print(&quot;IOException encountered&quot;);
+            }
+
+        }
+        catch(java.io.FileNotFoundException fileEx) {
+            System.out.println(&quot;Sentiment valences file not found!&quot;);
+        }
+    }
+
+    public void eval() {
+
+        // Initialize output value
+        out.value = 0.0;
+
+        // Split up the input string
+        String inputString = org.apache.drill.exec.expr.fn.impl.StringFunctionHelpers.toStringFromUTF8(input.start, input.end, input.buffer);
+        String[] splitInputString = inputString.split(&quot;\\s+&quot;);
+
+        for(int i = 0; i &lt; splitInputString.length; i++) {
+
+            java.lang.Object result = com.yourgroupidentifier.udf.dictHolder.sentiDict.get(splitInputString[i].toLowerCase());
+
+            if(result != null) {
+
+                Double wordValue = ((Double) result);
+
+                out.value += wordValue;
+            }
+        }
+
+    }
+
+}
+</code></pre>
+
+<p>(Remember to change the line with <code>/path/to/vader_sentiment_lexicon.txt</code> so that it reflects the location of the file on
+your system!)</p>
+
+<p>The second file is called <code>dictHolder.java</code>, and contains this small class:</p>
+
+<pre><code class="language-java">package com.yourgroupidentifier.udf;
+
+public class dictHolder {
+    static public java.util.Hashtable&lt;String, Double&gt; sentiDict;
+
+    public dictHolder() {
+        sentiDict = new java.util.Hashtable&lt;String, Double&gt;();
+    }
+}
+</code></pre>
+
+<h2 id="building-and-installing-our-udf">Building and installing our UDF</h2>
+
+<p>To build and install the custom function, just go to the project&rsquo;s root directory (the one with <code>pom.xml</code>) and issue
+these commands</p>
+
+<pre><code>$ mvn clean package
+$ cp target/*.jar ~/apache-drill/jars/3rdparty
+</code></pre>
+
+<p>changing the second command to be appropriate for your Drill install.</p>
+
+<p>And that&rsquo;s literally all there is to it! You should now be able to invoke the <code>SIMPLESENT()</code> function from within
+Drill&rsquo;s SQL prompt. In the next article I&rsquo;ll be doing exactly that as I explore a corpus of Reddit submission titles
+using this handy new analysis tool.</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

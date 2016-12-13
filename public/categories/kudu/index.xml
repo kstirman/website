@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/kudu/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/kudu/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>SQL on Kudu quickstart</title>
+      <link>/kstirman.github.io/bookshelf/blog/SQL-on-Kudu-quickstart/</link>
+      <pubDate>Wed, 13 Jan 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/SQL-on-Kudu-quickstart/</guid>
+      <description>&lt;p&gt;&lt;a href=&#34;http://getkudu.io/&#34;&gt;Kudu&lt;/a&gt; is a new (currently in beta) distributed data storage system that attempts to unify the
+strengths of HBase and HDFS systems. Although initially developed at Cloudera, the software has recently been inducted
+into the Apache Incubator program. This means there&amp;rsquo;s a reasonable expectation of Kudu becoming the next big Next Big
+Thing in terms of data storage.&lt;/p&gt;
+
+&lt;p&gt;As the widely varied topics of this blog demonstrate, Drill devs aren&amp;rsquo;t very willing to let a potential source of
+valuable data slip by unnoticed, so of course they&amp;rsquo;ve been hard at work on a new storage plugin. Starting in Drill 1.5
+(due out January 2016), performing SQL queries on a Kudu system will be as easy as:&lt;/p&gt;
+
+&lt;p&gt;1.) &lt;a href=&#34;https://drill.apache.org/docs/installing-drill-on-linux-and-mac-os-x/&#34;&gt;Installing Drill&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;2.) Starting the &lt;code&gt;drill-embedded&lt;/code&gt; binary&lt;/p&gt;
+
+&lt;p&gt;3.) Opening the Drill Web Console (&lt;a href=&#34;http://localhost:8047&#34;&gt;http://localhost:8047&lt;/a&gt;)&lt;/p&gt;
+
+&lt;p&gt;4.) Navigating to &amp;lsquo;Storage&amp;rsquo; and creating a new &amp;lsquo;kudu&amp;rsquo; plugin that contains this configuration:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;{
+  &amp;quot;type&amp;quot;: &amp;quot;kudu&amp;quot;,
+  &amp;quot;enabled&amp;quot;: true,
+  &amp;quot;masterAddresses&amp;quot;: &amp;quot;&amp;lt;kudu_master_server_ip_address_1&amp;gt;,&amp;lt;kudu_master_server_ip_address_2&amp;gt;,&amp;lt;etc&amp;gt;&amp;quot;
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;5.) Enabling the storage plugin&lt;/p&gt;
+
+&lt;p&gt;You should now see &amp;lsquo;kudu&amp;rsquo; show up after running a &lt;code&gt;show databases;&lt;/code&gt; command within Drill.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

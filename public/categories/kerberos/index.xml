@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/kerberos/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/kerberos/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Securing SQL on Hadoop, Part 2: Installing and configuring Drill</title>
+      <link>/kstirman.github.io/bookshelf/blog/securing-SQL-on-Hadoop-part-2-installing-and-configuring-Drill/</link>
+      <pubDate>Mon, 25 Jan 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/securing-SQL-on-Hadoop-part-2-installing-and-configuring-Drill/</guid>
+      <description>
+
+&lt;p&gt;Today we&amp;rsquo;re going to pick up where we left off in &lt;a href=&#34;http://www.dremio.com/blog/securing-sql-on-hadoop-part-1-installing-cdh-and-kerberos/&#34;&gt;Part
+1&lt;/a&gt; of my two-parter about setting
+up a CDH cluster to perform secure SQL queries on an HDFS store. As you recall, last time we had just finished using
+Cloudera Manager&amp;rsquo;s wizard to finalize a Kerberos configuration, and all of the cluster services had come back online
+using the new security system so our basic HDFS cluster set-up was good to go. All that&amp;rsquo;s left to do now is install and
+configure the piece of software that implements the SQL interface: Apache Drill.&lt;/p&gt;
+
+&lt;h2 id=&#34;step-1-drill-prerequisites&#34;&gt;Step 1.) Drill prerequisites&lt;/h2&gt;
+
+&lt;p&gt;First things first: We&amp;rsquo;re gonna need Java 7 or better on our CDH machines. Following some useful information found
+&lt;a href=&#34;http://lifeonubuntu.com/ubuntu-missing-add-apt-repository-command/&#34;&gt;here&lt;/a&gt; and
+&lt;a href=&#34;http://askubuntu.com/questions/508546/howto-upgrade-java-on-ubuntu-14-04-lts&#34;&gt;here&lt;/a&gt;, we can set up a new package
+repository and pull it down using:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ sudo apt-get install software-properties-common python-software-properties
+$ sudo add-apt-repository ppa:webupd8team/java
+$ sudo apt-get update
+$ sudo apt-get install oracle-java7-installer
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;(Remember to do this for each node on your cluster!)&lt;/p&gt;
+
+&lt;h2 id=&#34;step-2-install-drill&#34;&gt;Step 2.) Install Drill&lt;/h2&gt;
+
+&lt;p&gt;Time to install Drill and tell it where the cluster&amp;rsquo;s &amp;lsquo;Zookeeper&amp;rsquo; is (REMEMBER: Just like installing Java, this step
+needs to be done on every node). Start by downloading and unpacking the software:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ wget http://apache.osuosl.org/drill/drill-1.4.0/apache-drill-1.4.0.tar.gz
+$ tar xzvf apache-drill-1.4.0.tar.gz
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Next edit Drill&amp;rsquo;s &lt;code&gt;conf/drill-override.conf&lt;/code&gt; file so that it looks like:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;drill.exec: {
+  cluster-id: &amp;quot;drill-cdh-cluster&amp;quot;,
+  zk.connect: &amp;quot;&amp;lt;ZOOKEEPER IP&amp;gt;:2181&amp;quot;
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Where &amp;lsquo;ZOOKEEPER IP&amp;rsquo; should be changed to the IP of the CDH machine that runs the zookeeper process (this is probably
+the same as the Main Node from the last article).&lt;/p&gt;
+
+&lt;p&gt;If you&amp;rsquo;d like, you can add Drill to the system path by adding this to &lt;code&gt;.bashrc&lt;/code&gt;:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;export PATH=$PATH:/apache-drill-1.4.0/bin
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;step-3-configuring-drill-for-hdfs&#34;&gt;Step 3.) Configuring Drill for HDFS&lt;/h2&gt;
+
+&lt;p&gt;Now we need to set up Drill so that it can read our cluster&amp;rsquo;s HDFS. Open the Drill Web Console by going to
+http://&amp;lt;MAIN NODE IP&amp;gt;:8047. Click &amp;lsquo;Storage&amp;rsquo; at the top and then &amp;lsquo;Update&amp;rsquo; next to the dfs plugin and copy the JSON
+that you find in the text field. Next make a new storage plugin called &amp;lsquo;hdfs&amp;rsquo; (previous page) and then paste in the text
+you just copied, replacing the &amp;lsquo;null&amp;rsquo; that&amp;rsquo;s already there.&lt;/p&gt;
+
+&lt;p&gt;We&amp;rsquo;ll proceed by making a small modification that turns this standard &amp;lsquo;dfs&amp;rsquo; plugin in into our new one for HDFS.&lt;/p&gt;
+
+&lt;p&gt;Take the line&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;quot;connection&amp;quot;: &amp;quot;file:///&amp;quot;,
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;and replace it with&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;quot;connection&amp;quot;: &amp;quot;hdfs://&amp;lt;ADDRESS OF HDFS NAMENODE&amp;gt;:8020&amp;quot;,
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Hit &amp;ldquo;Create&amp;rdquo; and now Drill is ready to read your HDFS data!&lt;/p&gt;
+
+&lt;h2 id=&#34;step-4-enabling-kerberos-support-for-drill&#34;&gt;Step 4.) Enabling Kerberos support for Drill&lt;/h2&gt;
+
+&lt;p&gt;So now we have HDFS, Kerberos, &lt;em&gt;and&lt;/em&gt; Drill, but currently Drill can&amp;rsquo;t talk to the HDFS we have running because it
+requires authentication. Let&amp;rsquo;s fix that.&lt;/p&gt;
+
+&lt;p&gt;First we should make an HDFS superuser account as indicated in this &lt;a href=&#34;http://www.cloudera.com/documentation/enterprise/latest/topics/cm_sg_s5_hdfs_principal.html&#34;&gt;Cloudera
+doc&lt;/a&gt;. On the Main Node, run
+&lt;code&gt;sudo kadmin.local&lt;/code&gt; and add an &amp;lsquo;hdfs&amp;rsquo; principal with this command:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;addprinc hdfs@KERBEROS.CDH
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;(Hit Ctrl-d to exit the prompt). In order to enable authentication with Kerberos, we also need to copy the file
+&lt;code&gt;hadoop-yarn-api.jar&lt;/code&gt; into Drill&amp;rsquo;s class path:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ cp /opt/cloudera/parcels/CDH-5.5.1-1.cdh5.5.1.p0.11/lib/hadoop/client/hadoop-yarn-api.jar ~/apache-drill/jars/
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;(NOTE: &lt;em&gt;The above step and the three following must be performed on each node of the cluster&lt;/em&gt;.)&lt;/p&gt;
+
+&lt;p&gt;Next, Drill&amp;rsquo;s &lt;code&gt;conf/core-site.xml&lt;/code&gt; file should be edited to contain the following snippet of xml:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;lt;property&amp;gt;
+  &amp;lt;name&amp;gt;hadoop.security.authentication&amp;lt;/name&amp;gt;
+  &amp;lt;value&amp;gt;kerberos&amp;lt;/value&amp;gt;
+&amp;lt;/property&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;All that&amp;rsquo;s left to do is create an &amp;lsquo;hdfs&amp;rsquo; Kerberos ticket for the user that we&amp;rsquo;re logged into&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ kinit hdfs@KERBEROS.CDH
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;and then start up each of the drillbits&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;drillbit.sh start
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;So now Drill has both the configuration and the authority to use our kerberized HDFS store. Give it a shot by opening up
+a Drill prompt (&lt;code&gt;drill-conf&lt;/code&gt;) and trying a query.&lt;/p&gt;
+
+&lt;p&gt;For example, here&amp;rsquo;s a test query on my handy 250 GB of Reddit data:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT title, TO_TIMESTAMP(CAST(created_utc AS INT)) created, score FROM hdfs.`/data/RS_full_corpus.json` WHERE over_18 = false AND score &amp;gt;= 100 LIMIT 10;
++------------------------------------------------------------------------------+------------------------+--------+
+|                                    title                                     |        created         | score  |
++------------------------------------------------------------------------------+------------------------+--------+
+| Early Retirement Guide - Phillip Greenspun                                   | 2006-01-30 19:21:17.0  | 223    |
+| Programming Like A Mathematician I: Closures                                 | 2006-01-29 18:14:30.0  | 178    |
+| More than 1000 wikipedia alterations by US Representative Staffers           | 2006-01-29 12:57:45.0  | 304    |
+| Great Design: What is Design?                                                | 2006-01-26 20:54:30.0  | 143    |
+| Use Python (not Java) to teach programming                                   | 2006-01-26 19:43:23.0  | 167    |
+| The Demotivators!                                                            | 2006-01-26 18:02:51.0  | 168    |
+| Just how much can you achieve with pure CSS? Some amazing demonstrations.    | 2006-02-26 18:07:57.0  | 329    |
+| A summary of two lectures by Alan Kay                                        | 2006-02-24 04:56:49.0  | 110    |
+| How Intel could buy Hollywood and profit by selling more DRM-less machines.  | 2006-02-20 20:48:18.0  | 108    |
+| &amp;quot;zeitgeist&amp;quot; reddits, covering popular topics, eg, the infamous cartoons      | 2006-02-19 19:33:59.0  | 299    |
++------------------------------------------------------------------------------+------------------------+--------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And that wraps up Part 2 of this how-to guide. May all your queries be fruitful and secure!&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;Acknoweldgements: Many thanks to William Witt over on the user@drill.apache.org mailing list for providing crucial
+information about Kerberos-Drill configuration!&lt;/em&gt;&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Securing SQL on Hadoop, Part 1: Installing CDH and Kerberos</title>
+      <link>/kstirman.github.io/bookshelf/blog/securing-SQL-on-Hadoop-part-1-installing-CDH-and-Kerberos/</link>
+      <pubDate>Fri, 22 Jan 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/securing-SQL-on-Hadoop-part-1-installing-CDH-and-Kerberos/</guid>
+      <description>
+
+&lt;h2 id=&#34;introduction&#34;&gt;Introduction&lt;/h2&gt;
+
+&lt;p&gt;In the Dremio Blog we&amp;rsquo;ve talked about pairing Drill with HDFS before, but never with the emphasis on security that so
+often comes hand-in-hand with enterprise applications. So today&amp;rsquo;s post marks the beginning of a two part series
+explaining how to set up a cluster environment that enables &lt;em&gt;secure&lt;/em&gt; SQL queries to data stored on HDFS. For this
+article&amp;rsquo;s test &amp;lsquo;hardware&amp;rsquo; we&amp;rsquo;ll use six instances provisioned from Amazon&amp;rsquo;s EC2 service, while the core software
+components will be provided by Cloudera&amp;rsquo;s Hadoop system, CDH, paired with Ubuntu 14.04. The &amp;lsquo;secure&amp;rsquo; element of this
+cluster environment with be enabled via Kerberos, which is an industry standard in the realm of authentication software.&lt;/p&gt;
+
+&lt;h2 id=&#34;step-1-cluster-set-up&#34;&gt;Step 1.) Cluster Set Up&lt;/h2&gt;
+
+&lt;p&gt;In general I&amp;rsquo;ll be going into a significant amount of detail for this setup, since Kerberos configuration can be, well,
+&lt;em&gt;hard&lt;/em&gt;. I am, however, going to assume right now that you know your way around the AWS Management Console, and can
+handle setting up a few instances and configuring them by yourself. Remember to select &amp;lsquo;Ubuntu 14.04&amp;rsquo; for the operating
+system, and make a security group for the cluster that opens all the the TCP and UDP ports between machines in the
+cluster, just to be sure they can communicate freely with eachother. You&amp;rsquo;ll also want to open all ICMP ports (for ping),
+and TCP port 7180 for the Cloudera Manager software that we&amp;rsquo;ll be using shortly. Things like system specs and storage
+are obviously somewhat up to you to decide on, but I went with fairly muscular &amp;lsquo;m4.xlarge&amp;rsquo; instances that had 250 GB of
+storage each (more than big enough for my Reddit submission corpus test data, which was featured in &lt;a href=&#34;http://www.dremio.com/blog/old-and-busted-teasing-formerly-fashionable-websites-from-reddit-data/&#34;&gt;this previous
+article&lt;/a&gt;).&lt;/p&gt;
+
+&lt;h2 id=&#34;step-2-install-cdh-with-cloudera-manager&#34;&gt;Step 2.) Install CDH with Cloudera Manager&lt;/h2&gt;
+
+&lt;p&gt;We&amp;rsquo;ll perform the install of CDH (and thus, our HDFS store) by using Cloudera&amp;rsquo;s awesome Cloudera Manager software, which
+is &lt;a href=&#34;http://www.cloudera.com/downloads/manager/5-5-1.html&#34;&gt;available here&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;After you download the .bin file from this site to one of the nodes on your cluster, mark it as executable and run it
+(from here on out I&amp;rsquo;ll call the node that you selected for this step the &amp;lsquo;Main Node&amp;rsquo;).&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ chmod +x cloudera-manager-installer.bin
+$ sudo ./cloudera-manager-installer.bin
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Once this software finishes running you can point a browser to the Main Node&amp;rsquo;s URL (available from the AWS EC2 web
+interface) on port 7180. From here you can complete the install of CDH to rest of your cluster (the initial username and
+password are both &amp;lsquo;admin&amp;rsquo;). There are various options that show up as you progress through the steps, but for this
+simple example it&amp;rsquo;s sufficient to accept the defaults for most cases. Just be sure to check the &amp;ldquo;Install Oracle Java SE
+Development Kit&amp;rdquo; and &amp;ldquo;Install Java Unlimited Strength Encryption Policy Files&amp;rdquo; boxes when they show up (this last one
+can be relevant to Kerberos encryption). You&amp;rsquo;ll also need to specify the user &amp;lsquo;ubuntu&amp;rsquo; and the relevant private key
+&amp;lsquo;.pem&amp;rsquo; file for your cluster when you hit the &amp;ldquo;Provide SSH login credentials&amp;rdquo; screen. And the basic &amp;ldquo;Core Hadoop&amp;rdquo; option
+is fine when t comes to choosing what package set to install.&lt;/p&gt;
+
+&lt;p&gt;That&amp;rsquo;s really all there is to getting the Hadoop side of things running for this project. Shockingly easy, right?&lt;/p&gt;
+
+&lt;p&gt;But now it&amp;rsquo;s time for Kerberos. Sigh.&lt;/p&gt;
+
+&lt;h2 id=&#34;step-3a-install-and-configure-kerberos-main-node&#34;&gt;Step 3a.) Install and Configure Kerberos: Main Node&lt;/h2&gt;
+
+&lt;p&gt;Okay, it&amp;rsquo;s not actually all that bad. All we have to do is install some packages on the cluster and do some small edits
+to conf files before we can hand it off to the Clouder Manager wizard for Kerberos configuration (let me say it again:
+Cloudera Manager is awesome).&lt;/p&gt;
+
+&lt;p&gt;Let&amp;rsquo;s begin with that needs to be done on the Main Node, which in the parlance of Kerberos will become the &amp;lsquo;KDC&amp;rsquo; (Key
+Distribution Center) of our authentication system. As per this &lt;a href=&#34;https://help.ubuntu.com/community/Kerberos&#34;&gt;Ubuntu
+documentation&lt;/a&gt; (which was a useful reference for many of the following
+steps), go ahead and install these two packages&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ sudo apt-get install krb5-kdc krb5-admin-server
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;entering &amp;ldquo;KEBEROS.CDH&amp;rdquo; for the realm name in the first field that pops up, and specifying the Main Node&amp;rsquo;s internal DNS
+name in the next two (again these can be found on the AWS EC2 instance page&amp;mdash;they&amp;rsquo;re formatted like
+&amp;ldquo;ip-172.XXX.XXX.XXX.us-west-2.compute.internal&amp;rdquo;). Then run&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ sudo dpkg-reconfigure krb5-kdc
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;and select &amp;ldquo;Yes.&amp;rdquo;&lt;/p&gt;
+
+&lt;p&gt;Now it&amp;rsquo;s time to edit the &lt;code&gt;/etc/krb5kdc/kdc.conf&lt;/code&gt; file as recommended in &lt;a href=&#34;http://www.cloudera.com/documentation/enterprise/latest/topics/cm_sg_s4_kerb_wizard.html&#34;&gt;these Cloudera
+instructions&lt;/a&gt;. Place the
+lines&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;max_life = 1d
+max_renewable_life = 7d
+kdc_tcp_ports = 88
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;in the KERBEROS.CDH &amp;lsquo;[realms]&amp;rsquo; entry, replacing any similar lines and deleting &amp;lsquo;kdc_ports&amp;rsquo; both there underneath
+&amp;lsquo;[kdcdefaults].&amp;rsquo; Alright! On to the next file.&lt;/p&gt;
+
+&lt;p&gt;Create (or open) &lt;code&gt;/etc/krb5kdc/kadm5.acl&lt;/code&gt;, and insert this line:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;*/admin@KERBEROS.CDH    *
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now it&amp;rsquo;s time to initialize the Kerberos realm with:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ sudo krb5_newrealm
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Cool. Now, we need to create the credentials that the Cloudera Manager wizard will use when it completes our Kerberos
+setup. To do this enter the command&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ sudo kadmin.local
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;and from within the prompt that&amp;rsquo;s presented, type:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;addprinc -pw &amp;lt;PASSWORD&amp;gt; cloudera-scm/admin@KERBEROS.CDH
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now hit Crtl-D to exit the prompt, and install one last package:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ sudo apt-get install ldap-utils
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;step-3b-install-and-configure-kerberos-other-nodes&#34;&gt;Step 3b.) Install and Configure Kerberos: Other Nodes&lt;/h2&gt;
+
+&lt;p&gt;Compared to the Main Node setup, this step is mercifully brief. For each other note in the cluster you just need to
+install this package:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ sudo apt-get install krb5-user
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;When you&amp;rsquo;re presented with the text fields this time you can just hit enter, because the wizard will end up handling
+this stuff for you in the end.&lt;/p&gt;
+
+&lt;h2 id=&#34;step-4-use-the-cloudera-manager-kerberos-wizard&#34;&gt;Step 4.) Use the Cloudera Manager Kerberos wizard&lt;/h2&gt;
+
+&lt;p&gt;To start the Kerberos wizard, select &amp;ldquo;Enable Kerberos&amp;rdquo; from the dropdown menu for the cluster (see Figure 1).&lt;/p&gt;
+
+&lt;p&gt;&lt;br&gt;
+&lt;p style=&#34;text-align: center;&#34;&gt;
+&lt;img style=&#34;max-width: 100%;&#34; src=&#34;kstirman.github.io/bookshelf/img/cloudera_kerberos.jpg&#34;&gt;
+&lt;/p&gt;
+&lt;p style=&#34;text-align: center; font-style: italic;&#34;&gt;&lt;b&gt;Figure 1&lt;/b&gt;: Starting Cloudera Manager&amp;rsquo;s Kerberos wizard.&lt;/p&gt;
+&lt;br&gt;&lt;/p&gt;
+
+&lt;p&gt;First you&amp;rsquo;re asked to check a bunch of boxes which are friendly reminders of all the prep work you need to do before the
+wizard can take over. We&amp;rsquo;ve done all of this in the previous steps, so you can check away with wild abandon.&lt;/p&gt;
+
+&lt;p&gt;On the next page put the AWS internal address for the Main Node in the field marked &amp;ldquo;KDC Server Host&amp;rdquo; and then
+&amp;ldquo;KERBEROS.CDH&amp;rdquo; for the realm name. Hit &amp;ldquo;Continue&amp;rdquo; and then check the &amp;ldquo;Manage krb5.conf through Cloudera Manager&amp;rdquo; box.
+The defaults here are fine.&lt;/p&gt;
+
+&lt;p&gt;Now you need to enter the credentials that were set up in Step 3a. As per &lt;a href=&#34;http://www.cloudera.com/documentation/enterprise/latest/topics/cm_sg_s3_cm_principal.html&#34;&gt;this Cloudera
+doc&lt;/a&gt; we made the account
+&amp;lsquo;cloudera-scm/admin&amp;rsquo;, so go ahead and put that username and whatever password you chose into this page.&lt;/p&gt;
+
+&lt;p&gt;From here you can just hit &amp;ldquo;Continue&amp;rdquo; until you&amp;rsquo;re presented with a &amp;ldquo;Yes, I am ready to restart the cluster now&amp;rdquo;
+checkbox. Check it, and (you guessed it!) hit &amp;ldquo;Continue&amp;rdquo; again. The wizard will now stop all the services and bring them
+back up with Kerberos authentication activated.&lt;/p&gt;
+
+&lt;p&gt;That&amp;rsquo;s it! You now have a Kerberos-secured CDH cluster!&lt;/p&gt;
+
+&lt;p&gt;This is cool in itself, but in my next post we&amp;rsquo;ll get to the real heart of the matter: Installing and configuring Apache
+Drill on this system so that we can perform the secure SQL queries that I advertized in the article title. Stay tuned!&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

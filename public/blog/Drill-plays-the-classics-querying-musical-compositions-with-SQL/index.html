@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Drill plays the classics: Querying musical compositions with SQL</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Drill plays the classics: Querying musical compositions with SQL</h1>
+          <h4>by Nathan Griffith on 2016-01-21</h4>
+          <p>Today in &lsquo;Wow, I never expected to use SQL for <em>that!</em>,&rsquo; I&rsquo;m going to show how you can use Drill (along with a simple
+command line utility) to analyze musical compositions for sound and style characteristics.</p>
+
+<p>The music we&rsquo;ll be analyzing is a selection of piano pieces written by various classical composers. In particular, we&rsquo;ll
+be looking at representations of this music encoded into MIDI files created by one Bernd Krueger, who hosts them on his
+site: www.piano-midi.de. A linchpin of this approach will be the super cool command line utility <code>midicsv</code> (<a href="http://www.fourmilab.ch/webtools/midicsv/">available
+here</a>), which translates the events of a MIDI file into text in the form of a
+CSV file.</p>
+
+<p>After a little prepwork I found myself with a directory called <code>music_csv</code> which held the CSV-translated MIDI files in
+subdirectories named after each of the composers I had downloaded. As we can see on the midicsv web site, the third
+column of each CSV listing contains the type of event. Two of these that might be of particular interest are &lsquo;Note_on_c&rsquo;
+and &lsquo;Tempo&rsquo;, which respectively begin playing a note and set the current tempo of the piece. For &lsquo;Note_on_c&rsquo; the value
+we&rsquo;ll pay attention to (the note being played) is in column five, while for &lsquo;Tempo&rsquo; we&rsquo;ll (unsurprisingly) be looking at
+tempo values, which for this event type show up in column four.</p>
+
+<p>In MIDI notes are identified by a number, with &lsquo;60&rsquo; being Middle C, and 59 and 61 being the notes just below and just
+above that location. So first let&rsquo;s examine the &lsquo;average note&rsquo; for each composer&rsquo;s selection. This might be a good
+choice if we&rsquo;re looking for music that sounds somewhat dramatic, due to the presence of more notes from the bottom half
+of the keyboard. A Drill query to my <code>music_csv</code> directory that gives me each composer&rsquo;s average note looks like:</p>
+
+<pre><code>  SELECT dir0 composer, AVG(CAST(TRIM(columns[4]) AS INT)) `average note`
+    FROM dfs.`/path/to/music_csv`
+   WHERE columns[2] LIKE ' Note_on_c'
+GROUP BY dir0
+ORDER BY `average note`;
+</code></pre>
+
+<p>Which yields the following:</p>
+
+<pre><code>+--------------+---------------------+
+|   composer   |    average note     |
++--------------+---------------------+
+| borodin      | 61.21679561573178   |
+| mendelssohn  | 61.601812135524604  |
+| schumann     | 62.13615485564304   |
+| bach         | 62.41817789291883   |
+| chopin       | 62.59844650639674   |
+| beethoven    | 62.94818578301335   |
+| granados     | 62.998422159887795  |
+| schubert     | 63.03703764725266   |
+| mussorgsky   | 63.205213945135924  |
+| debussy      | 63.73597678916828   |
+| brahms       | 63.85321901437839   |
+| tchaikovsky  | 63.93177966101695   |
+| grieg        | 65.22842035060975   |
+| burgmueller  | 65.4425336466567    |
+| balakirew    | 66.0802039293708    |
+| albeniz      | 66.68735803242735   |
+| mozart       | 67.12492121887229   |
+| liszt        | 67.51094939468125   |
+| haydn        | 67.87497578301583   |
++--------------+---------------------+
+</code></pre>
+
+<p>So for moodier music, it looks like Borodin is your best bet.</p>
+
+<p>Next we&rsquo;ll try a similar query for the average tempo of a composer&rsquo;s selections. This could be useful if you&rsquo;re looking
+for either tranquil or spritely music:</p>
+
+<pre><code>  SELECT dir0 composer, AVG(CAST(TRIM(columns[3]) AS INT)) `average tempo`
+    FROM dfs.`/Users/ngriffith/Downloads/music_csv`
+   WHERE columns[2] LIKE ' Tempo'
+GROUP BY dir0
+ORDER BY `average tempo`;
+</code></pre>
+
+<p>With:</p>
+
+<pre><code>+--------------+---------------------+
+|   composer   |    average tempo    |
++--------------+---------------------+
+| grieg        | 463950.99792665546  |
+| balakirew    | 516662.79188934295  |
+| chopin       | 549635.4575186928   |
+| schubert     | 555130.6943059019   |
+| granados     | 559992.7081807082   |
+| beethoven    | 562109.4496243594   |
+| mussorgsky   | 572826.2225694832   |
+| tchaikovsky  | 582765.8715467677   |
+| burgmueller  | 585393.9650706437   |
+| borodin      | 587289.7334545455   |
+| albeniz      | 588197.7116116117   |
+| liszt        | 591821.5634490239   |
+| debussy      | 599595.9116922494   |
+| haydn        | 606727.8991650156   |
+| schumann     | 620904.3406527168   |
+| mozart       | 634484.8481915854   |
+| bach         | 665263.0298245614   |
+| brahms       | 688238.5542258788   |
+| mendelssohn  | 695130.138571672    |
++--------------+---------------------+
+</code></pre>
+
+<p>So start your search for slower music with Grieg, and go to Mendelssohn if you&rsquo;d prefer something faster. (If you&rsquo;re
+curious, the unit used for tempo here is the length of a quarter note in microseconds).</p>
+
+<p>Note that both of these examples rely on Drill&rsquo;s ability to query entire directories (and subdirectories!) of files at once.
+And I&rsquo;ve also used the <code>dir0</code> variable to my advantage in order to provide the name of the composer from my folder
+hierarchy.</p>
+
+<p>Querying classical music compositions is definitely an unexpected and wonderful way to use Drill!</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

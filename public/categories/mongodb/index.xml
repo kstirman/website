@@ -1,0 +1,561 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/mongodb/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/mongodb/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Setting up an SQL interface to a sharded MongoDB</title>
+      <link>/kstirman.github.io/bookshelf/blog/setting-up-an-SQL-interface-to-a-sharded-MongoDB/</link>
+      <pubDate>Wed, 02 Dec 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/setting-up-an-SQL-interface-to-a-sharded-MongoDB/</guid>
+      <description>&lt;p&gt;Salutations, data fans! Today I&amp;rsquo;d like to demonstrate how to use Apache Drill to query a sharded MongoDB database
+running on a computer cluster.&lt;/p&gt;
+
+&lt;p&gt;To begin with, I&amp;rsquo;m going to assume you already know how to do a sharded Mongo setup (the &lt;a href=&#34;https://docs.mongodb.org/manual/sharding/&#34;&gt;official
+documentation&lt;/a&gt; is very helpful), or you already have access to a system with
+a sharded MongoDB in place. With this out of the way, I can focus on the Drill setup.&lt;/p&gt;
+
+&lt;p&gt;When running in a multiple machine environment, Drill can increase its efficiency for very large queries by coordinating
+between several instances of a service called a &amp;lsquo;drillbit.&amp;rsquo; To help track these instances we use a piece of software
+called &lt;a href=&#34;https://zookeeper.apache.org/&#34;&gt;Apache Zookeeper&lt;/a&gt;. Once Zookeeper is installed, you should make a &amp;lsquo;zoo.cfg&amp;rsquo; file
+in its &amp;lsquo;./conf&amp;rsquo; directory. This simple one works fine for our purposes (create a &amp;lsquo;dataDir&amp;rsquo; as needed):&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;tickTime=2000
+dataDir=/home/cluster-user/zookeeper/data
+clientPort=2183
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Next you should download and install Drill to each of the nodes in the cluster that you&amp;rsquo;d like a drillbit to run on. For
+my setup I&amp;rsquo;ve chosen to run a drillbit on each node that contains a MongoDB shard. This is a good idea because Drill
+considers the location of data stores when it performs queries. The ./conf/drill-override.conf file for each install
+should be edited to reflect the IP address and port of your Zookeeper. For instance, you could write:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;drill.exec: {
+  cluster-id: &amp;quot;drill-cluster-example&amp;quot;,
+  zk.connect: &amp;quot;172.31.0.0:2183&amp;quot;
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Where the name &amp;ldquo;drill-cluster-example&amp;rdquo; is the same for each node.&lt;/p&gt;
+
+&lt;p&gt;With this minor bit of configuration out of the way, all that&amp;rsquo;s left is to start the software. First bring up the
+Zookeeper server with &amp;lsquo;~/zookeeper/bin/zkServer.sh start&amp;rsquo;, and then launch the drillbits by running
+&amp;lsquo;~/apache-drill/bin/drillbit.sh start&amp;rsquo; on each node.
+After you&amp;rsquo;ve started everything, you can run &amp;lsquo;drill-conf&amp;rsquo; to bring you to an SQL prompt. If all is well, you
+should be able to run &lt;code&gt;SELECT * FROM sys.drillbits;&lt;/code&gt; and see each drillbit on the cluster report in. For example on a
+three machine test cluster I saw the following:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; select * from sys.drillbits;
++----------------------------------------------+------------+---------------+------------+----------+
+|                   hostname                   | user_port  | control_port  | data_port  | current  |
++----------------------------------------------+------------+---------------+------------+----------+
+| ip-172-31-41-122.us-west-2.compute.internal  | 31010      | 31011         | 31012      | false    |
+| ip-172-31-41-120.us-west-2.compute.internal  | 31010      | 31011         | 31012      | false    |
+| ip-172-31-41-121.us-west-2.compute.internal  | 31010      | 31011         | 31012      | true     |
++----------------------------------------------+------------+---------------+------------+----------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now all that&amp;rsquo;s left is to activate the Drill interface to MongoDB. Open the Drill Web Console by visiting one of the
+nodes that&amp;rsquo;s running a drillbit (use port 8047, just like before). From here click &amp;ldquo;Enable&amp;rdquo; next to the &amp;ldquo;mongo&amp;rdquo; plugin,
+and then hit &amp;ldquo;Update.&amp;rdquo; Now change &amp;ldquo;localhost:27017&amp;rdquo; in the &amp;ldquo;connection&amp;rdquo; field to correspond to the IP and port of the
+machine that runs your &amp;lsquo;mongos&amp;rsquo; process. If you have more than one &amp;ldquo;mongos&amp;rdquo; you can specify them all like this:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;...
+  &amp;quot;connection&amp;quot;: &amp;quot;mongodb://172.31.41.120:27017,172.31.41.121:27017,172.31.41.122:27017&amp;quot;,
+...
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And that&amp;rsquo;s it! You&amp;rsquo;re now all set to run SQL queries on your sharded MongoDB via Drill. For an example of how to
+interface with some complicated JSON-based data that&amp;rsquo;s typical of MongoDB collections, check out &lt;a href=&#34;http://www.dremio.com/blog/bless-this-mess-working-with-complicated-json-structure-in-sql/&#34;&gt;this
+other&lt;/a&gt; post.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Bless this mess: Working with complicated JSON structure in SQL</title>
+      <link>/kstirman.github.io/bookshelf/blog/bless-this-mess-workng-with-complicated-JSON-structure-in-SQL/</link>
+      <pubDate>Tue, 01 Dec 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/bless-this-mess-workng-with-complicated-JSON-structure-in-SQL/</guid>
+      <description>&lt;p&gt;Data you find on the web comes in all formats. From simple CSV to some really creepy-crawly JSON. The data provided by
+the Twitter API to describe a tweet unfortunately falls within the latter category.&lt;/p&gt;
+
+&lt;p&gt;In this article I&amp;rsquo;ll use Drill to provide an SQL interface to a MongoDB collection of about 52,000 tweets pulled from
+the Twitter streaming API. As I alluded to, tweet data presents itself in a way that manifests a lot of nested elements,
+and documents in the collection follow this JSON structure:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;{
+  &amp;quot;contributors&amp;quot;: null,
+  &amp;quot;coordinates&amp;quot;: null,
+  &amp;quot;created_at&amp;quot;: &amp;quot;Mon Nov 09 23:18:16 +0000 2015&amp;quot;,
+  &amp;quot;entities&amp;quot;: {
+    &amp;quot;hashtags&amp;quot;: [],
+    &amp;quot;media&amp;quot;: [
+      {
+        &amp;quot;display_url&amp;quot;: &amp;quot;pic.twitter.com/NNAPr46qDz&amp;quot;,
+        &amp;quot;expanded_url&amp;quot;: &amp;quot;http://twitter.com/NewsFlashback/status/663858171639939072/photo/1&amp;quot;,
+        &amp;quot;id&amp;quot;: 663858170704490496,
+        &amp;quot;id_str&amp;quot;: &amp;quot;663858170704490496&amp;quot;,
+        &amp;quot;indices&amp;quot;: [
+          121,
+          144
+        ],
+        &amp;quot;media_url&amp;quot;: &amp;quot;http://pbs.twimg.com/media/CTZ_fS4U8AAkti7.jpg&amp;quot;,
+        &amp;quot;media_url_https&amp;quot;: &amp;quot;https://pbs.twimg.com/media/CTZ_fS4U8AAkti7.jpg&amp;quot;,
+        &amp;quot;sizes&amp;quot;: {
+          &amp;quot;large&amp;quot;: {
+            &amp;quot;h&amp;quot;: 450,
+            &amp;quot;resize&amp;quot;: &amp;quot;fit&amp;quot;,
+            &amp;quot;w&amp;quot;: 450
+          },
+          &amp;quot;medium&amp;quot;: {
+            &amp;quot;h&amp;quot;: 450,
+            &amp;quot;resize&amp;quot;: &amp;quot;fit&amp;quot;,
+            &amp;quot;w&amp;quot;: 450
+          },
+          &amp;quot;small&amp;quot;: {
+            &amp;quot;h&amp;quot;: 340,
+            &amp;quot;resize&amp;quot;: &amp;quot;fit&amp;quot;,
+            &amp;quot;w&amp;quot;: 340
+          },
+          &amp;quot;thumb&amp;quot;: {
+            &amp;quot;h&amp;quot;: 150,
+            &amp;quot;resize&amp;quot;: &amp;quot;crop&amp;quot;,
+            &amp;quot;w&amp;quot;: 150
+          }
+        },
+        &amp;quot;type&amp;quot;: &amp;quot;photo&amp;quot;,
+        &amp;quot;url&amp;quot;: &amp;quot;https://t.co/NNAPr46qDz&amp;quot;
+      }
+    ],
+    ... etc
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;(see &lt;a href=&#34;https://gist.github.com/nategri/c34e1868792b23e97f2f&#34;&gt;this link&lt;/a&gt; for the whole entry). That looks pretty intense,
+right? But don&amp;rsquo;t worry&amp;mdash;Drill is up to the task! We&amp;rsquo;ll be talking to that mess with ANSI SQL in no time.&lt;/p&gt;
+
+&lt;p&gt;Assuming you&amp;rsquo;ve already connected Drill to your MongoDB (just click &amp;lsquo;Enable&amp;rsquo; next to the MongoDB plugin at
+&lt;a href=&#34;http://localhost:8047/storage&#34;&gt;http://localhost:8047/storage&lt;/a&gt; after running &lt;code&gt;drill-embedded&lt;/code&gt;), we&amp;rsquo;re ready to begin querying the Twitter data using SQL.&lt;/p&gt;
+
+&lt;p&gt;For my analysis goal, I’m going focus on coming up with a method to examine the number of hashtags that occur in tweets
+from verified users in my data set. To begin, let’s look at the array of hashtags that the tweet JSON lists for verified
+users with at least one hashtag:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-sql&#34;&gt;SELECT tw.id `Tweet Id`, tw.`user`.screen_name `Screen Name`, tw.entities.hashtags `Hashtag Array`
+  FROM dfs.`/path/to/tweets.small.json` tw
+ WHERE tw.entities.hashtags[0].text IS NOT NULL
+   AND tw.`user`.verified = true
+ LIMIT 15;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;With results:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;+---------------------+----------------+-----------------------------------------------------------------------------------+
+|      Tweet Id       |  Screen Name   |                                   Hashtag Array                                   |
++---------------------+----------------+-----------------------------------------------------------------------------------+
+| 663858238757199873  | FinishLine     | [{&amp;quot;indices&amp;quot;:[116,132],&amp;quot;text&amp;quot;:&amp;quot;TheFundamentals&amp;quot;}]                                  |
+| 663858343581237248  | antena3com     | [{&amp;quot;indices&amp;quot;:[82,97],&amp;quot;text&amp;quot;:&amp;quot;MarDePlástico8&amp;quot;}]                                     |
+| 663858351978078208  | tacobell       | [{&amp;quot;indices&amp;quot;:[12,28],&amp;quot;text&amp;quot;:&amp;quot;TacoEmojiEngine&amp;quot;}]                                    |
+| 663858351990697984  | tacobell       | [{&amp;quot;indices&amp;quot;:[14,30],&amp;quot;text&amp;quot;:&amp;quot;TacoEmojiEngine&amp;quot;}]                                    |
+| 663858553329815553  | CollegeHumor   | [{&amp;quot;indices&amp;quot;:[0,14],&amp;quot;text&amp;quot;:&amp;quot;TheCrunchBowl&amp;quot;}]                                       |
+| 663858746251042816  | tacobell       | [{&amp;quot;indices&amp;quot;:[12,28],&amp;quot;text&amp;quot;:&amp;quot;TacoEmojiEngine&amp;quot;}]                                    |
+| 663859039831486465  | VctorClavijo   | [{&amp;quot;indices&amp;quot;:[14,23],&amp;quot;text&amp;quot;:&amp;quot;Carlos10&amp;quot;}]                                           |
+| 663859115358158848  | FarnamHorse    | [{&amp;quot;indices&amp;quot;:[0,11],&amp;quot;text&amp;quot;:&amp;quot;DidYouKnow&amp;quot;}]                                          |
+| 663859161503928320  | vpelham        | [{&amp;quot;indices&amp;quot;:[20,29],&amp;quot;text&amp;quot;:&amp;quot;feminist&amp;quot;},{&amp;quot;indices&amp;quot;:[127,136],&amp;quot;text&amp;quot;:&amp;quot;feminism&amp;quot;}]   |
+| 663859312469651456  | AlPrimerToque  | [{&amp;quot;indices&amp;quot;:[0,18],&amp;quot;text&amp;quot;:&amp;quot;LorenzoEnOndaCero&amp;quot;}]                                   |
+| 663859425715834880  | NewsTalk770    | [{&amp;quot;indices&amp;quot;:[82,91],&amp;quot;text&amp;quot;:&amp;quot;yycroads&amp;quot;},{&amp;quot;indices&amp;quot;:[92,103],&amp;quot;text&amp;quot;:&amp;quot;yyctraffic&amp;quot;}]  |
+| 663859471844810752  | BrentASJax     | [{&amp;quot;indices&amp;quot;:[70,83],&amp;quot;text&amp;quot;:&amp;quot;FirstAlertWX&amp;quot;}]                                       |
+| 663859530598514688  | simpsonwhnt    | [{&amp;quot;indices&amp;quot;:[102,111],&amp;quot;text&amp;quot;:&amp;quot;valleywx&amp;quot;}]                                         |
+| 663859702535553024  | PrimerImpacto  | [{&amp;quot;indices&amp;quot;:[75,89],&amp;quot;text&amp;quot;:&amp;quot;PrimerImpacto&amp;quot;}]                                      |
+| 663859799004581888  | DPostSports    | [{&amp;quot;indices&amp;quot;:[41,49],&amp;quot;text&amp;quot;:&amp;quot;Rockies&amp;quot;}]                                            |
++---------------------+----------------+-----------------------------------------------------------------------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now I’ll use the &lt;code&gt;FLATTEN()&lt;/code&gt; function on the array to make one row for each hashtag in a tweet:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-sql&#34;&gt;SELECT tw.id `Tweet Id`, tw.`user`.screen_name `Screen Name`, FLATTEN(tw.entities.hashtags) `Hashtags`
+  FROM dfs.`/path/to/tweets.small.json` tw
+ WHERE tw.entities.hashtags[0].text IS NOT NULL
+   AND tw.`user`.verified = true
+ LIMIT 15;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;pre&gt;&lt;code&gt;+---------------------+----------------+-------------------------------------------------+
+|      Tweet Id       |  Screen Name   |                    Hashtags                     |
++---------------------+----------------+-------------------------------------------------+
+| 663858238757199873  | FinishLine     | {&amp;quot;indices&amp;quot;:[116,132],&amp;quot;text&amp;quot;:&amp;quot;TheFundamentals&amp;quot;}  |
+| 663858343581237248  | antena3com     | {&amp;quot;indices&amp;quot;:[82,97],&amp;quot;text&amp;quot;:&amp;quot;MarDePlástico8&amp;quot;}     |
+| 663858351978078208  | tacobell       | {&amp;quot;indices&amp;quot;:[12,28],&amp;quot;text&amp;quot;:&amp;quot;TacoEmojiEngine&amp;quot;}    |
+| 663858351990697984  | tacobell       | {&amp;quot;indices&amp;quot;:[14,30],&amp;quot;text&amp;quot;:&amp;quot;TacoEmojiEngine&amp;quot;}    |
+| 663858553329815553  | CollegeHumor   | {&amp;quot;indices&amp;quot;:[0,14],&amp;quot;text&amp;quot;:&amp;quot;TheCrunchBowl&amp;quot;}       |
+| 663858746251042816  | tacobell       | {&amp;quot;indices&amp;quot;:[12,28],&amp;quot;text&amp;quot;:&amp;quot;TacoEmojiEngine&amp;quot;}    |
+| 663859039831486465  | VctorClavijo   | {&amp;quot;indices&amp;quot;:[14,23],&amp;quot;text&amp;quot;:&amp;quot;Carlos10&amp;quot;}           |
+| 663859115358158848  | FarnamHorse    | {&amp;quot;indices&amp;quot;:[0,11],&amp;quot;text&amp;quot;:&amp;quot;DidYouKnow&amp;quot;}          |
+| 663859161503928320  | vpelham        | {&amp;quot;indices&amp;quot;:[20,29],&amp;quot;text&amp;quot;:&amp;quot;feminist&amp;quot;}           |
+| 663859161503928320  | vpelham        | {&amp;quot;indices&amp;quot;:[127,136],&amp;quot;text&amp;quot;:&amp;quot;feminism&amp;quot;}         |
+| 663859312469651456  | AlPrimerToque  | {&amp;quot;indices&amp;quot;:[0,18],&amp;quot;text&amp;quot;:&amp;quot;LorenzoEnOndaCero&amp;quot;}   |
+| 663859425715834880  | NewsTalk770    | {&amp;quot;indices&amp;quot;:[82,91],&amp;quot;text&amp;quot;:&amp;quot;yycroads&amp;quot;}           |
+| 663859425715834880  | NewsTalk770    | {&amp;quot;indices&amp;quot;:[92,103],&amp;quot;text&amp;quot;:&amp;quot;yyctraffic&amp;quot;}        |
+| 663859471844810752  | BrentASJax     | {&amp;quot;indices&amp;quot;:[70,83],&amp;quot;text&amp;quot;:&amp;quot;FirstAlertWX&amp;quot;}       |
+| 663859530598514688  | simpsonwhnt    | {&amp;quot;indices&amp;quot;:[102,111],&amp;quot;text&amp;quot;:&amp;quot;valleywx&amp;quot;}         |
++---------------------+----------------+-------------------------------------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;You can probably guess where I’m heading by now. A &lt;code&gt;COUNT()&lt;/code&gt; and &lt;code&gt;GROUP BY&lt;/code&gt; on a table like this can give us the number
+hashtags in each tweet. So let’s make a temporary reference to this query’s output with Drill’s &amp;lsquo;view&amp;rsquo; functionality. To
+do this we switch to the local file system’s temporary workspace and then run a CREATE VIEW command:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-sql&#34;&gt;&amp;gt; USE dfs.tmp;
+&amp;gt; CREATE VIEW hashtags AS SELECT tw.id `Tweet Id`, tw.`user`.screen_name `Screen Name`, FLATTEN(tw.entities.hashtags) `Hashtags` FROM dfs.`/path/to/tweets.small.json` tw WHERE tw.entities.hashtags[0].text IS NOT NULL AND tw.`user`.verified = true;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And now we’re ready to query our &amp;lsquo;hashtags&amp;rsquo; view to sort verified tweets by the number of hashtags.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-sql&#34;&gt;  SELECT `Tweet Id`, `Screen Name`, COUNT(`Tweet Id`) `Num Hashtags`
+    FROM hashtags
+GROUP BY `Tweet Id`, `Screen Name`
+ORDER BY `Num Hashtags` DESC
+   LIMIT 15;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;pre&gt;&lt;code&gt;+---------------------+------------------+---------------+
+|      Tweet Id       |   Screen Name    | Num Hashtags  |
++---------------------+------------------+---------------+
+| 663860369459384320  | SOFIALAMA        | 4             |
+| 663861480945664004  | ChrisMillerKUTV  | 3             |
+| 663861938103930880  | XboxFR           | 3             |
+| 663862705674133504  | sputnik_TR       | 2             |
+| 663862542079557633  | WHO              | 2             |
+| 663862743427076096  | ljcisneros       | 2             |
+| 663861338310053888  | joelcomm         | 2             |
+| 663859161503928320  | vpelham          | 2             |
+| 663861027948249088  | joemaalouftv     | 2             |
+| 663859425715834880  | NewsTalk770      | 2             |
+| 663861791303274497  | DezMandamentos   | 2             |
+| 663860684006952960  | RogerCookMLA     | 2             |
+| 663859799004581888  | DPostSports      | 1             |
+| 663859702535553024  | PrimerImpacto    | 1             |
+| 663859039831486465  | VctorClavijo     | 1             |
++---------------------+------------------+---------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Ta da!&lt;/p&gt;
+
+&lt;p&gt;But views aren’t just for simplifying SQL statements. For instance, you could also employ a view to create a shortcut to
+a query that joins several different files and/or databases. And since views only store queries and not data, you can
+make a lot of them without worrying about consuming the amount of disk space associated with table creation.&lt;/p&gt;
+
+&lt;p&gt;So to recap: In this post I&amp;rsquo;ve showcased how to deal with complicated nested JSON data in Drill, while also
+demonstrating how a &amp;lsquo;view&amp;rsquo; can improve the flow and readability of your analysis.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Finding corrupt JSON records in MongoDB</title>
+      <link>/kstirman.github.io/bookshelf/blog/finding-corrupt-JSON-records-in-MongoDB/</link>
+      <pubDate>Mon, 30 Nov 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/finding-corrupt-JSON-records-in-MongoDB/</guid>
+      <description>&lt;p&gt;A few weeks ago I mangled a MongoDB collection I was working with by importing a file I&amp;rsquo;d corrupted with a manual edit.
+The change I introduced was small, but serious enough to cause my Drill queries to fail. In this post I&amp;rsquo;m going to
+simulate this situation with an intentionally besmirched JSON file imported into MongoDB.&lt;/p&gt;
+
+&lt;p&gt;Today&amp;rsquo;s data set comes from some tweets that I pulled from Twitter&amp;rsquo;s streaming API. So let&amp;rsquo;s try to use Drill to query
+for some tweet id&amp;rsquo;s:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT id FROM mongo.tweets.small;
+Error: SYSTEM ERROR: IllegalArgumentException: You tried to write a VarChar type when you are using a ValueWriter of
+type NullableBigIntWriterImpl.
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Annnnd: No luck!&lt;/p&gt;
+
+&lt;p&gt;But can I at least look at the first 10 values?&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT id FROM mongo.tweets.small LIMIT 10;
+Error: SYSTEM ERROR: IllegalArgumentException: You tried to write a VarChar type when you are using a ValueWriter of
+type NullableBigIntWriterImpl.
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Still nothing. But let&amp;rsquo;s take a close look at the error message&amp;mdash;it looks like Drill is upset about about variable
+types. This is a good time to switch on Drill&amp;rsquo;s &lt;code&gt;union_type&lt;/code&gt; functionality, which will allow us to query a column that
+has multiple types of data.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; ALTER SYSTEM SET `exec.enable_union_type` = true;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now let&amp;rsquo;s ask for the &amp;lsquo;tweet id&amp;rsquo; value again, and this time tack on a column that tells us the type of the variable.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT id, TYPEOF(id) type FROM mongo.tweets.small LIMIT 10;
++---------------------+---------+
+|         id          |  type   |
++---------------------+---------+
+| 663858171623030785  | BIGINT  |
+| 663858171635589120  | BIGINT  |
+| 663858171627245572  | BIGINT  |
+| 663858171631374336  | BIGINT  |
+| 663858171631415296  | BIGINT  |
+| 663858171648184320  | BIGINT  |
+| 663858171635625984  | BIGINT  |
+| 663858171623043072  | BIGINT  |
+| 663858171618791424  | BIGINT  |
+| 663858171627175936  | BIGINT  |
++---------------------+---------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Looks like &amp;lsquo;BIGINT&amp;rsquo; is the standard type for the &amp;lsquo;id&amp;rsquo; values. So is there any case in which the type is &lt;em&gt;not&lt;/em&gt; equal to
+&amp;lsquo;BIGINT&amp;rsquo;? Let&amp;rsquo;s use this query:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT id, TYPEOF(id) type FROM mongo.tweets.small WHERE TYPEOF(id) NOT LIKE &#39;BIGINT&#39;;
++---------------------+----------+
+|         id          |   type   |
++---------------------+----------+
+| 663858171627352065  | VARCHAR  |
++---------------------+----------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Gotcha! I now have the offending tweet id in hand, so if I want to I can go back and fix the JSON file I imported. (In
+this case I had put quotes around the value, which caused it to read in as a string and not a number. Removing those
+quotes will do the trick and make the file read correctly.)&lt;/p&gt;
+
+&lt;p&gt;This makes for a fairly quick and easy way to hunt down issues in corrupted databases. Try it out next time you find
+yourself struggling with something that looks like a type error.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Bringing SQL to MongoDB with Apache Drill</title>
+      <link>/kstirman.github.io/bookshelf/blog/bringing-SQL-to-MongoDB-with-Apache-Drill/</link>
+      <pubDate>Sun, 20 Sep 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/bringing-SQL-to-MongoDB-with-Apache-Drill/</guid>
+      <description>
+
+&lt;p&gt;If you’re reading this post, then chances are you’ve found yourself wishing you
+could talk to your MongoDB data store using a standard SQL interface. There are
+lots of good reasons to do this: Maybe you’d like to port some existing code
+with a minimum of fuss, or maybe you’re dealing with a lot of different data
+storage types and would like to unify them all under a single interface (hint:
+Apache Drill is fantastic for this). Whatever your reason, this guide will step
+you through a simple single-computer example of how to connect these two tools.
+I’ll be demonstrating how to accomplish this task on a Linux system, but
+MongoDB and Apache Drill are both available for OS X and Windows as well.&lt;/p&gt;
+
+&lt;h2 id=&#34;step-1-install-mongodb&#34;&gt;Step 1: Install MongoDB&lt;/h2&gt;
+
+&lt;p&gt;First we need to download a tarball of the MongoDB software,
+so pop open a terminal and grab it with this command:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ wget https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-3.0.6.tgz
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Next we’ll make a folder in our home directory where MongoDB will reside, extract the tarball we downloaded, and copy the contents to that directory (feel free to delete redundant files as you go here):&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ mkdir ~/mongodb
+$ tar xzvf mongodb-linux-x86_64–3.0.6.tgz
+$ cp -r ~/mongodb-linux-x86_64–3.0.6/* ~/mongodb
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;It would probably be a good idea to put the MongoDB binaries directory in the system PATH, so edit ~/.bashrc and insert this statement:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;export PATH=~/mongodb/bin:$PATH
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now we’ll make a folder to house MongoDB databases within our home directory, and start the MongoDB daemon.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ mkdir ~/mongodb/data
+$ mongod --dbpath ~/mongodb/data &amp;amp;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Or if you’d prefer to not have the daemon attached to your terminal (so it can stay open when you close the window) instead run:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ nohup mongod --dbpath ~/mongodb/data &amp;amp;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;step-2-loading-some-example-data-into-mongodb&#34;&gt;Step 2: Loading Some Example Data Into MongoDB&lt;/h2&gt;
+
+&lt;p&gt;For the example data in this guide I’ve decided to use the results of a query to &lt;a href=&#34;http://earthquake.usgs.gov/earthquakes/search/&#34;&gt;this USGS archive of seismic
+events&lt;/a&gt;. I ended up taking all events from 1980 through 2014 that
+occurred within a region that I defined using the web interface (see Figure 1).&lt;/p&gt;
+
+&lt;p&gt;&lt;br&gt;
+&lt;br&gt;
+&lt;p style=&#34;text-align: center;&#34;&gt;
+&lt;img style=&#34;max-width: 100%;&#34; src=&#34;kstirman.github.io/bookshelf/img/earthquake_map.png&#34;&gt;
+&lt;/p&gt;
+&lt;p style=&#34;text-align: center; font-style: italic;&#34;&gt;Figure 1: My example data set contains seismic event data from this
+region of the United States. Events date from Jan. 1, 1980 to Dec. 31, 2014.&lt;/p&gt;
+&lt;br&gt;
+&lt;br&gt;&lt;/p&gt;
+
+&lt;p&gt;A number of options are available for output on the web site, and I decided to go with CSV. We can import a CSV file (in this case the result of the USGS query, renamed to ‘quakes.csv’) into MongoDB using the following command:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ mongoimport --db quakedata --type csv --headerline --file quakes.csv
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Note: This command creates a MongoDB collection called ‘quakes’ in a database named ‘quakedata.’
+To verify that the imported data is indeed accessible via our MongoDB server, we enter the mongo shell by typing&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ mongo
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now we can switch to the ‘quakedata’ database, and enter this simple query which asks for a single event with a magnitude of 5.1:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; use quakedata
+switched to db quakedata
+&amp;gt; db.quakes.find({mag:5.1}).limit(1).pretty()
+{
+  &amp;quot;_id&amp;quot; : ObjectId(&amp;quot;55fdd74548f529cf40132523&amp;quot;),
+  &amp;quot;time&amp;quot; : &amp;quot;1983–10–07T10:18:46.150Z&amp;quot;,
+  &amp;quot;latitude&amp;quot; : 43.938,
+  &amp;quot;longitude&amp;quot; : -74.258,
+  &amp;quot;depth&amp;quot; : 12.5,
+  &amp;quot;mag&amp;quot; : 5.1,
+  &amp;quot;magType&amp;quot; : &amp;quot;mb&amp;quot;,
+  &amp;quot;nst&amp;quot; : &amp;quot;&amp;quot;,
+  &amp;quot;gap&amp;quot; : &amp;quot;&amp;quot;,
+  &amp;quot;dmin&amp;quot; : &amp;quot;&amp;quot;,
+  &amp;quot;rms&amp;quot; : &amp;quot;&amp;quot;,
+  &amp;quot;net&amp;quot; : &amp;quot;us&amp;quot;,
+  &amp;quot;id&amp;quot; : &amp;quot;usp0001yuv&amp;quot;,
+  &amp;quot;updated&amp;quot; : &amp;quot;2015–02–11T17:15:07.000Z&amp;quot;,
+  &amp;quot;place&amp;quot; : &amp;quot;New York&amp;quot;,
+  &amp;quot;type&amp;quot; : &amp;quot;earthquake&amp;quot;
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;It looks like our MongoDB is up and running!&lt;/p&gt;
+
+&lt;h2 id=&#34;step-3-installing-and-configuring-apache-drill&#34;&gt;Step 3: Installing and Configuring Apache Drill&lt;/h2&gt;
+
+&lt;p&gt;To install Apache Drill we’ll first grab another tarball:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;wget http://getdrill.org/drill/download/apache-drill-1.1.0.tar.gz
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Then, just like before, we’ll make an install folder inside our home directory, placing the contents of the decompressed .tgz file within.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ mkdir ~/apache-drill
+$ tar xzvf apache-drill-1.1.0.tar.gz
+$ cp -r ~/apache-drill-1.1.0/* ~/apache-drill
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And if you’d like the Drill binary directory in your system path, add this to your ~/.bashrc file:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;PATH=~/apache-drill/bin:$PATH
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Next we need to configure Drill so that it sees our MongoDB database. To do this first start the Drill shell by running&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ drill-embedded
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;(don’t be afraid if it takes a while to start). Then direct a web browser to the address &lt;a href=&#34;http://127.0.0.1:8047&#34;&gt;http://127.0.0.1:8047&lt;/a&gt;. This page is called the Drill Web Console.
+Now select Storage from the top menu bar, and click Update next to the entry named ‘mongo’ that appears under the Disabled Storage Plugins heading. On the page that loads, click “Enable.”
+That’s it! Now if you type “show databases;” into the Apache Drill shell, you ought to see the database “mongo.quakedata” listed.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; show databases;
++ — — — — — — — — — — -+
+|     SCHEMA_NAME      |
++ — — — — — — — — — — -+
+| INFORMATION_SCHEMA   |
+| cp.default           |
+| dfs.default          |
+| dfs.root             |
+| dfs.tmp              |
+| mongo.local          |
+| mongo.quakedata      |
+| sys                  |
++ — — — — — — — — — — -+
+8 rows selected (0.591 seconds)
+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And we can switch to our seismic information database by simply typing&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;USE mongo.quakedata;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;step-4-manipulating-a-mongodb-database-with-ansi-sql&#34;&gt;Step 4: Manipulating a MongoDB database with ANSI SQL&lt;/h2&gt;
+
+&lt;p&gt;A.k.a. “The fun part.” Now that we have Apache Drill installed and configured to work with our MongoDB database we can immediately start inspecting our data using a standard SQL interface.
+For instance if we wanted to see the different types of seismic events cataloged in our data set, we would just use the standard SQL:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT DISTINCT type FROM quakes;
++ — — — — — — — — — -+
+|       type         |
++ — — — — — — — — — -+
+| mining explosion   |
+| earthquake         |
+| quarry blast       |
+| explosion          |
+| rock burst         |
++ — — — — — — — — — -+
+5 rows selected (8.312 seconds)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Before we do anything more sophisticated, it would probably be good to issue this command, which tells Drill to read numeric text fields as floating point numbers:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;ALTER SYSTEM SET `store.mongo.read_numbers_as_double` = true;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;So what can we do with this data set? Well, let’s use &lt;a href=&#34;http://earthquake.usgs.gov/research/induced/&#34;&gt;this USGS page&lt;/a&gt; about induced earthquakes as a rough guide and look at the number of magnitude 3.0 or greater earthquakes in our data that occurred between 1980 and 2009, and between 2009 and the end of 2014.
+The first (1980–2009) query:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT COUNT(type) FROM quakes WHERE `time` BETWEEN &#39;1980–01–01 00:00:00&#39; AND &#39;2008–12–31 23:59:59&#39; AND mag &amp;gt;= 3.0 AND type LIKE &#39;earthquake&#39;;
++ — — — — -+
+| EXPR$0   |
++ — — — — -+
+| 918      |
++ — — — — -+
+1 row selected (5.798 seconds)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And the second (2009–2014) query:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT COUNT(type) FROM quakes WHERE `time` BETWEEN &#39;2009–01–01 00:00:00&#39; AND &#39;2014–12–31 23:59:59&#39; AND mag &amp;gt;= 3.0 AND type LIKE &#39;earthquake&#39;;
++ — — — — -+
+| EXPR$0   |
++ — — — — -+
+| 1340     |
++ — — — — -+
+1 row selected (3.549 seconds)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;(Note that since ‘time’ is a reserved keyword, we need to enclose it in backquotes to tell Drill that we’re talking about a field in our dataset).
+That’s definitely more earthquakes in a much smaller time span, and our results line up approximately with what the plot on the USGS page indicates. Now let’s issue a couple new commands to inspect the average depth of the events in these sets. Do induced quakes have a lower average depth? A higher one? We can shed some light on this by making a slight modification to the last two queries.
+For 1980–2009 we have an average depth:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT AVG(depth) FROM quakes WHERE `time` BETWEEN &#39;1980–01–01 00:00:00&#39; AND &#39;2008–12–31 23:59:59&#39; AND mag &amp;gt;= 3.0 AND type LIKE &#39;earthquake&#39;;
++ — — — — — — — — — — +
+|       EXPR$0        |
++ — — — — — — — — — — +
+| 8.461002178649235   |
++ — — — — — — — — — — +
+1 row selected (3.018 seconds)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And 2009–2014 yields:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT AVG(depth) FROM quakes WHERE &#39;time&#39; BETWEEN &#39;2009–01–01 00:00:00&#39; AND &#39;2014–12–31 23:59:59&#39; AND mag &amp;gt;= 3.0 AND type LIKE &#39;earthquake&#39;;
++ — — — — — — — — — -+
+|      EXPR$0        |
++ — — — — — — — — — -+
+| 6.44491343283582   |
++ — — — — — — — — — -+
+1 row selected (2.385 seconds)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;We see now that quakes from the second set have an average depth about 2 kilometers shallower than those from the first set. This makes sense, because if a significant number of recent earthquake events are due to human activity, we would expect them to drag the all-event average closer to a depth where it’s easier for humans to reach (i.e., closer to the surface).
+So that’s it for this post! As you’ve seen, creating an SQL interface to MongoDB is incredibly straightforward, and I hope this guide has helped you realize what a powerful data management tool Apache Drill can be.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

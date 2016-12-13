@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/text/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/text/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Smartest and dumbest subreddits as judged by submission title readability</title>
+      <link>/kstirman.github.io/bookshelf/blog/smartest-and-dumbest-subreddits-as-judged-by-submission-title-readibility/</link>
+      <pubDate>Sat, 06 Feb 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/smartest-and-dumbest-subreddits-as-judged-by-submission-title-readibility/</guid>
+      <description>&lt;p&gt;Alright, time to put the readability UDF from &lt;a href=&#34;http://www.dremio.com/blog/querying-for-reading-level-with-a-simple-udf/&#34;&gt;my last
+post&lt;/a&gt; to work on some data! For today&amp;rsquo;s
+analysis, I&amp;rsquo;ll once again use this &lt;a href=&#34;https://www.reddit.com/r/datasets/comments/3mg812/full_reddit_submission_corpus_now_available_2006/&#34;&gt;Reddit submission
+corpus&lt;/a&gt;, which
+contains submission data from from the years 2006-2015.&lt;/p&gt;
+
+&lt;p&gt;The questions that motivate today&amp;rsquo;s analysis are simple, but fun: Which popular subreddits have the highest average
+submission title reading level? Which ones have the lowest? Or, more glibly, &amp;ldquo;Which subreddits are smart, and which are
+dumb?&amp;rdquo; My custom &lt;code&gt;READABILITY()&lt;/code&gt; function for Drill will help us settle this.&lt;/p&gt;
+
+&lt;p&gt;As usual when performing a slightly sophisticated analysis, I first shuffle the data through some VIEWs in order to
+grapple with it on my terms. In this case the prep work consisted of two VIEWs, which were constructed as follows:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW reddit_readability AS
+     SELECT title, READABILITY(title) ARI, subreddit
+       FROM hdfs.`/data/RS_full_corpus.json`
+      WHERE over_18 = &#39;false&#39;;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;which is in turn fed into:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW reddit AS
+     SELECT subreddit, COUNT(title) posts, AVG(ARI) `avg ARI`
+       FROM reddit_readability
+      GROUP BY subreddit;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;From here the query to ask for &amp;lsquo;smart&amp;rsquo; subreddits (as I&amp;rsquo;ve defined them) is easy:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT subreddit, posts, `avg ARI` FROM reddit WHERE posts &amp;gt; 100000 ORDER BY `avg ARI` DESC LIMIT 10;
++------------------------+---------+---------------------+
+|       subreddit        |  posts  |       avg ARI       |
++------------------------+---------+---------------------+
+| spam                   | 287305  | 15.658034632014635  |
+| longtail               | 134202  | 15.38567146310872   |
+| ModerationLog          | 356311  | 12.622485326455028  |
+| modlog                 | 266188  | 12.477493297559754  |
+| RisingThreads          | 142485  | 11.752936255500762  |
+| worldpolitics          | 163290  | 11.633828401867433  |
+| WritingPrompts         | 150776  | 11.348865875111446  |
+| environment            | 185858  | 11.167274719418218  |
+| Random_Acts_Of_Amazon  | 184420  | 11.14375363175314   |
+| conspiro               | 179705  | 10.868244970017907  |
++------------------------+---------+---------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;These results aren&amp;rsquo;t too surprising. Once the internal Reddit stuff is out of the way you&amp;rsquo;re left with some subjects
+that are pretty stereotypically high-minded: global politics, literary pursuits, and environmental issues. Also
+conspiracy theories, for some reason. That one&amp;rsquo;s weird.&lt;/p&gt;
+
+&lt;p&gt;Alright! On to the dumb stuff!&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT subreddit, posts, `avg ARI` FROM reddit WHERE posts &amp;gt; 100000 ORDER BY `avg ARI` LIMIT 10;
++-----------------------+----------+---------------------+
+|       subreddit       |  posts   |       avg ARI       |
++-----------------------+----------+---------------------+
+| me_irl                | 132477   | -6.597215524826628  |
+| itookapicture         | 226074   | 2.591935687626967   |
+| Fireteams             | 1600719  | 3.1183569978499373  |
+| amiugly               | 108643   | 3.135287171164027   |
+| Kikpals               | 170943   | 3.3521135496701313  |
+| offmychest            | 242639   | 3.794396824263522   |
+| Jokes                 | 163818   | 4.192728884240217   |
+| 4chan                 | 107196   | 4.337776062292176   |
+| GlobalOffensiveTrade  | 823488   | 4.346750167026149   |
+| reactiongifs          | 279156   | 4.464272224403798   |
++-----------------------+----------+---------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Yup. I can see why these subreddits are dumb. They might not be &lt;em&gt;bad&lt;/em&gt;, but they&amp;rsquo;re definitely not exactly intellectual. Instead it looks like they focus on funny stuff (jokes, Internet memes, gifs) and personal vanity.&lt;/p&gt;
+
+&lt;p&gt;I&amp;rsquo;d like to close on a more technical note that may help those of you looking to perform similar analyses: If you want
+to use a Drill UDF in a cluster setting, as I did here (a six-node HDFS configuration, for those curious) be sure to
+copy the relevant .jar files to the &lt;code&gt;jars/3rdparty&lt;/code&gt; directory of each machine&amp;rsquo;s Drill install. That&amp;rsquo;s all the setup required
+to start using the custom functions you&amp;rsquo;ve written on big data right away!&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Querying for reading level with a simple UDF</title>
+      <link>/kstirman.github.io/bookshelf/blog/querying-for-reading-level-with-a-simple-UDF/</link>
+      <pubDate>Fri, 05 Feb 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/querying-for-reading-level-with-a-simple-UDF/</guid>
+      <description>&lt;script type=&#34;text/javascript&#34;
+ src=&#34;http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML&#34;&gt;
+&lt;/script&gt;
+
+&lt;p&gt;Today, just like in &lt;a href=&#34;http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/&#34;&gt;this post&lt;/a&gt; from
+the previous week, I&amp;rsquo;d like to discuss creating a simple custom SQL function for Drill that maps strings to float
+values. Except this week&amp;rsquo;s function is even &lt;em&gt;more&lt;/em&gt; simple because it can fit within a single file and requires no
+instructions in the &lt;code&gt;setup()&lt;/code&gt; method. In fact, this may be the simplest example of a Drill UDF I&amp;rsquo;ve ever seen, so if
+you&amp;rsquo;ve been struggling with how to go about writing your own, the source code I&amp;rsquo;m presenting today maybe a good way to
+get some traction.&lt;/p&gt;
+
+&lt;p&gt;The raison d&amp;rsquo;&amp;ecirc;tre of today &amp;rsquo;s function is to calculate the reading level (or, &amp;lsquo;readability&amp;rsquo;) of a single sentence.
+Many solutions to the problem of readability utilize syllable counts, which are notoriously difficult to arrive at
+computationally. It&amp;rsquo;s possible that a lookup table for those counts would provide satisfactorily speedy results, but the
+algorithm that I&amp;rsquo;ve chosen to implement, called the automated readability index or ARI, avoids this problem by
+altogether using a character count instead. As per the &lt;a href=&#34;https://en.wikipedia.org/wiki/Automated_readability_index&#34;&gt;Wikipedia
+article&lt;/a&gt;, the ARI is arrived at via:&lt;/p&gt;
+
+&lt;p&gt;$$ ARI = 4.71 \frac{characters}{words} + 0.5 \frac{words}{sentences} - 21.43 $$&lt;/p&gt;
+
+&lt;p&gt;However, as I indicated earlier I&amp;rsquo;m only interested in the readability of single sentences in this particular
+application (check out the next article!), so I&amp;rsquo;m going to implicitly set the number of sentences to 1 in the source code
+that comes later.&lt;/p&gt;
+
+&lt;p&gt;But before I talk about source you should probably first get some UDF-creation boilerplate out of the way.  I&amp;rsquo;ve
+discussed how to do this a couple times, but if you&amp;rsquo;re still unsure of what to do go ahead and follow the instructions
+in the &amp;ldquo;Downloading Maven and starting a new project&amp;rdquo; section near the beginning of &lt;a href=&#34;http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/&#34;&gt;this
+article&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Once that&amp;rsquo;s out of the way, place this single file (&lt;code&gt;Readability.java&lt;/code&gt;) in your project&amp;rsquo;s
+&lt;code&gt;main/java/com/yourgroupidentifier/udf&lt;/code&gt; directory:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;package com.yourgroupidentifier.udf;
+
+import org.apache.drill.exec.expr.DrillSimpleFunc;
+import org.apache.drill.exec.expr.holders.NullableFloat8Holder;
+import org.apache.drill.exec.expr.holders.NullableVarCharHolder;
+
+import org.apache.drill.exec.expr.annotations.FunctionTemplate;
+import org.apache.drill.exec.expr.annotations.Output;
+import org.apache.drill.exec.expr.annotations.Param;
+
+@FunctionTemplate(
+        name = &amp;quot;readability&amp;quot;,
+        scope = FunctionTemplate.FunctionScope.SIMPLE,
+        nulls = FunctionTemplate.NullHandling.NULL_IF_NULL
+)
+
+public class Readability implements DrillSimpleFunc {
+
+    @Param
+    NullableVarCharHolder input;
+
+    @Output
+    NullableFloat8Holder out;
+
+    public void setup() {
+    }
+
+    public void eval() {
+
+        // The length of &#39;pneumonoultramicroscopicsilicovolcanoconiosis&#39;
+        final int longestWord = 45;
+
+        // Initialize output value
+        out.value = 0.0;
+
+        // Split input string up into words
+        String inputString = org.apache.drill.exec.expr.fn.impl.StringFunctionHelpers.toStringFromUTF8(input.start,
+input.end, input.buffer);
+        String[] inputStringWords = inputString.split(&amp;quot;\\s+&amp;quot;);
+
+        float numWords = inputStringWords.length;
+        float numCharacters = inputString.length() - (numWords-1); // Accounts for spaces
+
+        // Adjust for things in the text that aren&#39;t words
+        // i.e., They are longer than &#39;longestWord&#39;
+        for(int i = 0; i &amp;lt; inputStringWords.length; i++) {
+            if( inputStringWords[i].length() &amp;gt; longestWord) {
+                numWords--;
+                numCharacters = numCharacters - inputStringWords[i].length();
+            }
+        }
+
+        // Output &#39;NULL&#39; if the number of words is zero
+        if(numWords != 0) {
+            out.value = 4.71 * (numCharacters / numWords) + 0.5 * (numWords) - 21.43;
+        }
+        else {
+            out.isSet = 0;
+        }
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;This is pretty straight forward compared to the &lt;a href=&#34;http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/&#34;&gt;other
+examples&lt;/a&gt; I&amp;rsquo;ve &lt;a href=&#34;http://www.dremio.com/blog/querying-google-analytics-json-with-a-custom-sql-function/&#34;&gt;discussed
+before&lt;/a&gt;, right? Just about the
+only &amp;lsquo;trick&amp;rsquo; here is that I&amp;rsquo;ve made the number the function returns a &amp;lsquo;Nullable&amp;rsquo; type. This is to insure that it has a
+more sane output than &amp;lsquo;Infinity&amp;rsquo; when it encounters a field with zero words&amp;mdash;especially useful for when the
+function is used in conjunction with &lt;code&gt;AVG()&lt;/code&gt;, which disregards NULL values but would propagate any &amp;lsquo;Infinity&amp;rsquo; to the
+final result.&lt;/p&gt;
+
+&lt;p&gt;In the next post, we&amp;rsquo;ll try this function out in the &amp;lsquo;field&amp;rsquo; on one of my favorite data sets!&lt;/p&gt;
+
+&lt;p&gt;(And I &lt;em&gt;swear&lt;/em&gt; I didn&amp;rsquo;t make that pun intentionally.)&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

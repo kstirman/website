@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/views/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/views/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Old and busted: Teasing formerly-fashionable websites from Reddit data</title>
+      <link>/kstirman.github.io/bookshelf/blog/old-and-busted-tesasing-formery-fashionable-websites-from-Reddit-data/</link>
+      <pubDate>Sun, 03 Jan 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/old-and-busted-tesasing-formery-fashionable-websites-from-Reddit-data/</guid>
+      <description>&lt;p&gt;Anyone who spends even a little bit of time on the Internet knows how fickle and volatile the cultural scene is. And
+there&amp;rsquo;s perhaps no greater exemplar of this volatility than Reddit. For good or bad, Reddit communities often serve as
+tastemakers for the Internet at large. If your content is visible on Reddit, chances are that things are going great for
+you. And if not, well, maybe not&amp;hellip;&lt;/p&gt;
+
+&lt;p&gt;The topic for today&amp;rsquo;s post is pretty simple&amp;mdash;I&amp;rsquo;m just going to show off a cool analysis related to this
+observation. The data set will be a &lt;a href=&#34;https://www.reddit.com/r/datasets/comments/3mg812/full_reddit_submission_corpus_now_available_2006/&#34;&gt;JSON dump of all Reddit
+submissions&lt;/a&gt; from
+2006 up through Summer 2015, which I&amp;rsquo;ll be analyzing for site URLs that &lt;em&gt;used&lt;/em&gt; to be popular but have recently fallen
+out of favor. The size of this dump was fairly formidable (about a quarter-terabyte uncompressed), so on the backend
+this analysis was facilitated by running Drill in a cluster configuration on a Hadoop filesystem. This kept the runtime
+of the somewhat sophisticated query I needed to perform down to well under an hour.&lt;/p&gt;
+
+&lt;p&gt;So how exactly does one go about determining which Reddit submission URLs are, technically speaking, &amp;ldquo;old and busted&amp;rdquo;?
+Well, I started off my analysis by constructing a view to keep track of the relevant parameters and convert them to the
+correct format and units. In my case I&amp;rsquo;m interested the number of times a URL shows up in a submission, the average
+posting date for each URL, and the standard deviation in submission dates (in units of days):&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW reddit AS SELECT domain, COUNT(domain) counts, TO_TIMESTAMP(avg(CAST(created_utc AS FLOAT))) avg_date, STDDEV(CAST(created_utc AS FLOAT))/86400 std_dev_days
+       FROM hdfs.`/data/RS_full_corpus.json`
+   GROUP BY domain;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;So now it becomes fairly easy to construct a query on top of this view that looks for websites with old average
+submission dates that also exhibit fairly strongly clustering (which I&amp;rsquo;ll define as an average submission date older
+than Jan. 1, 2011 with a standard deviation in submission dates of less than 600 days). These two in combination will
+define our &amp;ldquo;old and busted&amp;rdquo; criterion.&lt;/p&gt;
+
+&lt;p&gt;The query looks like this, and returns these results:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT * FROM reddit WHERE std_dev_days &amp;lt; 600 AND avg_date &amp;lt; &#39;2011-01-01 00:00:00&#39; ORDER BY counts DESC LIMIT 20;
++------------------------+---------+--------------------------+---------------------+
+|         domain         | counts  |         avg_date         |    std_dev_days     |
++------------------------+---------+--------------------------+---------------------+
+| self.reddit.com        | 647870  | 2010-09-02 13:56:28.448  | 301.71035168793304  |
+| examiner.com           | 151810  | 2010-12-16 23:26:30.526  | 585.7963478654447   |
+| news.bbc.co.uk         | 88227   | 2009-10-19 22:09:54.047  | 499.8828691832385   |
+| squidoo.com            | 68613   | 2010-02-15 05:45:45.863  | 457.7467960677672   |
+| hubpages.com           | 57290   | 2010-01-30 02:18:28.314  | 353.1463760830986   |
+| msnbc.msn.com          | 43643   | 2010-06-13 13:34:33.274  | 491.4442681051865   |
+| associatedcontent.com  | 24146   | 2009-08-18 17:40:57.408  | 403.1500022424656   |
+| tinyurl.com            | 24070   | 2010-08-28 15:11:38.083  | 471.1292710623187   |
+| self.programming       | 20689   | 2009-11-08 14:04:07.185  | 239.53706245104482  |
+| physorg.com            | 17431   | 2010-09-27 02:00:58.908  | 435.832257804899    |
+| ehow.com               | 16228   | 2009-09-19 05:58:19.334  | 524.9960557567199   |
+| gather.com             | 15387   | 2010-06-28 12:05:28.479  | 365.76299060306405  |
+| english.aljazeera.net  | 14573   | 2010-10-02 14:05:55.813  | 360.5432415872375   |
+| subimg.net             | 13459   | 2010-09-29 09:48:42.801  | 278.7920245425415   |
+| helium.com             | 13337   | 2009-09-28 16:38:56.651  | 441.641404727207    |
+| sports.espn.go.com     | 12416   | 2010-10-17 19:30:23.67   | 493.84151020454976  |
+| rapidsharelist.net     | 12128   | 2010-04-26 15:53:44.063  | 14.947036935681274  |
+| waronyou.com           | 12036   | 2009-04-13 17:51:18.434  | 184.16688348655214  |
+| timesonline.co.uk      | 11100   | 2009-05-09 01:23:30.756  | 288.42826940864705  |
+| open.salon.com         | 10727   | 2010-08-10 09:48:09.563  | 494.63567877466306  |
++------------------------+---------+--------------------------+---------------------+
+20 rows selected (2490.628 seconds)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Using this list as a starting point, I started to do a little digging (see Table 1) into why these sites are no longer
+popular. What I found is that there a lot of reasons a site may end up in this ignominious category&amp;mdash;anything from
+a shift in the Google search algorithm to a simple redirect to a new URL. Other explanations included acquisition, a
+collapsed business model, and an outright ban of the URL from Reddit by site administrators.&lt;/p&gt;
+
+&lt;p&gt;&lt;br&gt;
+&lt;p style=&#34;text-align: center;&#34;&gt;
+&lt;img style=&#34;max-width: 80%;&#34; src=&#34;kstirman.github.io/bookshelf/img/reddit_url_table.png&#34;&gt;
+&lt;/p&gt;
+&lt;p style=&#34;text-align: center; font-style: italic;&#34;&gt;&lt;b&gt;Table 1&lt;/b&gt;: A selection of formerly-fashionable websites
+submitted to Reddit, and the suspected reason for their fall from grace.&lt;/p&gt;
+&lt;br&gt;&lt;/p&gt;
+
+&lt;p&gt;This is pretty interesting stuff, right? I&amp;rsquo;m definitely looking forward to using Drill to hunt for even more trends in
+the Reddit submission data.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Bless this mess: Working with complicated JSON structure in SQL</title>
+      <link>/kstirman.github.io/bookshelf/blog/bless-this-mess-workng-with-complicated-JSON-structure-in-SQL/</link>
+      <pubDate>Tue, 01 Dec 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/bless-this-mess-workng-with-complicated-JSON-structure-in-SQL/</guid>
+      <description>&lt;p&gt;Data you find on the web comes in all formats. From simple CSV to some really creepy-crawly JSON. The data provided by
+the Twitter API to describe a tweet unfortunately falls within the latter category.&lt;/p&gt;
+
+&lt;p&gt;In this article I&amp;rsquo;ll use Drill to provide an SQL interface to a MongoDB collection of about 52,000 tweets pulled from
+the Twitter streaming API. As I alluded to, tweet data presents itself in a way that manifests a lot of nested elements,
+and documents in the collection follow this JSON structure:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;{
+  &amp;quot;contributors&amp;quot;: null,
+  &amp;quot;coordinates&amp;quot;: null,
+  &amp;quot;created_at&amp;quot;: &amp;quot;Mon Nov 09 23:18:16 +0000 2015&amp;quot;,
+  &amp;quot;entities&amp;quot;: {
+    &amp;quot;hashtags&amp;quot;: [],
+    &amp;quot;media&amp;quot;: [
+      {
+        &amp;quot;display_url&amp;quot;: &amp;quot;pic.twitter.com/NNAPr46qDz&amp;quot;,
+        &amp;quot;expanded_url&amp;quot;: &amp;quot;http://twitter.com/NewsFlashback/status/663858171639939072/photo/1&amp;quot;,
+        &amp;quot;id&amp;quot;: 663858170704490496,
+        &amp;quot;id_str&amp;quot;: &amp;quot;663858170704490496&amp;quot;,
+        &amp;quot;indices&amp;quot;: [
+          121,
+          144
+        ],
+        &amp;quot;media_url&amp;quot;: &amp;quot;http://pbs.twimg.com/media/CTZ_fS4U8AAkti7.jpg&amp;quot;,
+        &amp;quot;media_url_https&amp;quot;: &amp;quot;https://pbs.twimg.com/media/CTZ_fS4U8AAkti7.jpg&amp;quot;,
+        &amp;quot;sizes&amp;quot;: {
+          &amp;quot;large&amp;quot;: {
+            &amp;quot;h&amp;quot;: 450,
+            &amp;quot;resize&amp;quot;: &amp;quot;fit&amp;quot;,
+            &amp;quot;w&amp;quot;: 450
+          },
+          &amp;quot;medium&amp;quot;: {
+            &amp;quot;h&amp;quot;: 450,
+            &amp;quot;resize&amp;quot;: &amp;quot;fit&amp;quot;,
+            &amp;quot;w&amp;quot;: 450
+          },
+          &amp;quot;small&amp;quot;: {
+            &amp;quot;h&amp;quot;: 340,
+            &amp;quot;resize&amp;quot;: &amp;quot;fit&amp;quot;,
+            &amp;quot;w&amp;quot;: 340
+          },
+          &amp;quot;thumb&amp;quot;: {
+            &amp;quot;h&amp;quot;: 150,
+            &amp;quot;resize&amp;quot;: &amp;quot;crop&amp;quot;,
+            &amp;quot;w&amp;quot;: 150
+          }
+        },
+        &amp;quot;type&amp;quot;: &amp;quot;photo&amp;quot;,
+        &amp;quot;url&amp;quot;: &amp;quot;https://t.co/NNAPr46qDz&amp;quot;
+      }
+    ],
+    ... etc
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;(see &lt;a href=&#34;https://gist.github.com/nategri/c34e1868792b23e97f2f&#34;&gt;this link&lt;/a&gt; for the whole entry). That looks pretty intense,
+right? But don&amp;rsquo;t worry&amp;mdash;Drill is up to the task! We&amp;rsquo;ll be talking to that mess with ANSI SQL in no time.&lt;/p&gt;
+
+&lt;p&gt;Assuming you&amp;rsquo;ve already connected Drill to your MongoDB (just click &amp;lsquo;Enable&amp;rsquo; next to the MongoDB plugin at
+&lt;a href=&#34;http://localhost:8047/storage&#34;&gt;http://localhost:8047/storage&lt;/a&gt; after running &lt;code&gt;drill-embedded&lt;/code&gt;), we&amp;rsquo;re ready to begin querying the Twitter data using SQL.&lt;/p&gt;
+
+&lt;p&gt;For my analysis goal, I’m going focus on coming up with a method to examine the number of hashtags that occur in tweets
+from verified users in my data set. To begin, let’s look at the array of hashtags that the tweet JSON lists for verified
+users with at least one hashtag:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-sql&#34;&gt;SELECT tw.id `Tweet Id`, tw.`user`.screen_name `Screen Name`, tw.entities.hashtags `Hashtag Array`
+  FROM dfs.`/path/to/tweets.small.json` tw
+ WHERE tw.entities.hashtags[0].text IS NOT NULL
+   AND tw.`user`.verified = true
+ LIMIT 15;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;With results:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;+---------------------+----------------+-----------------------------------------------------------------------------------+
+|      Tweet Id       |  Screen Name   |                                   Hashtag Array                                   |
++---------------------+----------------+-----------------------------------------------------------------------------------+
+| 663858238757199873  | FinishLine     | [{&amp;quot;indices&amp;quot;:[116,132],&amp;quot;text&amp;quot;:&amp;quot;TheFundamentals&amp;quot;}]                                  |
+| 663858343581237248  | antena3com     | [{&amp;quot;indices&amp;quot;:[82,97],&amp;quot;text&amp;quot;:&amp;quot;MarDePlástico8&amp;quot;}]                                     |
+| 663858351978078208  | tacobell       | [{&amp;quot;indices&amp;quot;:[12,28],&amp;quot;text&amp;quot;:&amp;quot;TacoEmojiEngine&amp;quot;}]                                    |
+| 663858351990697984  | tacobell       | [{&amp;quot;indices&amp;quot;:[14,30],&amp;quot;text&amp;quot;:&amp;quot;TacoEmojiEngine&amp;quot;}]                                    |
+| 663858553329815553  | CollegeHumor   | [{&amp;quot;indices&amp;quot;:[0,14],&amp;quot;text&amp;quot;:&amp;quot;TheCrunchBowl&amp;quot;}]                                       |
+| 663858746251042816  | tacobell       | [{&amp;quot;indices&amp;quot;:[12,28],&amp;quot;text&amp;quot;:&amp;quot;TacoEmojiEngine&amp;quot;}]                                    |
+| 663859039831486465  | VctorClavijo   | [{&amp;quot;indices&amp;quot;:[14,23],&amp;quot;text&amp;quot;:&amp;quot;Carlos10&amp;quot;}]                                           |
+| 663859115358158848  | FarnamHorse    | [{&amp;quot;indices&amp;quot;:[0,11],&amp;quot;text&amp;quot;:&amp;quot;DidYouKnow&amp;quot;}]                                          |
+| 663859161503928320  | vpelham        | [{&amp;quot;indices&amp;quot;:[20,29],&amp;quot;text&amp;quot;:&amp;quot;feminist&amp;quot;},{&amp;quot;indices&amp;quot;:[127,136],&amp;quot;text&amp;quot;:&amp;quot;feminism&amp;quot;}]   |
+| 663859312469651456  | AlPrimerToque  | [{&amp;quot;indices&amp;quot;:[0,18],&amp;quot;text&amp;quot;:&amp;quot;LorenzoEnOndaCero&amp;quot;}]                                   |
+| 663859425715834880  | NewsTalk770    | [{&amp;quot;indices&amp;quot;:[82,91],&amp;quot;text&amp;quot;:&amp;quot;yycroads&amp;quot;},{&amp;quot;indices&amp;quot;:[92,103],&amp;quot;text&amp;quot;:&amp;quot;yyctraffic&amp;quot;}]  |
+| 663859471844810752  | BrentASJax     | [{&amp;quot;indices&amp;quot;:[70,83],&amp;quot;text&amp;quot;:&amp;quot;FirstAlertWX&amp;quot;}]                                       |
+| 663859530598514688  | simpsonwhnt    | [{&amp;quot;indices&amp;quot;:[102,111],&amp;quot;text&amp;quot;:&amp;quot;valleywx&amp;quot;}]                                         |
+| 663859702535553024  | PrimerImpacto  | [{&amp;quot;indices&amp;quot;:[75,89],&amp;quot;text&amp;quot;:&amp;quot;PrimerImpacto&amp;quot;}]                                      |
+| 663859799004581888  | DPostSports    | [{&amp;quot;indices&amp;quot;:[41,49],&amp;quot;text&amp;quot;:&amp;quot;Rockies&amp;quot;}]                                            |
++---------------------+----------------+-----------------------------------------------------------------------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now I’ll use the &lt;code&gt;FLATTEN()&lt;/code&gt; function on the array to make one row for each hashtag in a tweet:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-sql&#34;&gt;SELECT tw.id `Tweet Id`, tw.`user`.screen_name `Screen Name`, FLATTEN(tw.entities.hashtags) `Hashtags`
+  FROM dfs.`/path/to/tweets.small.json` tw
+ WHERE tw.entities.hashtags[0].text IS NOT NULL
+   AND tw.`user`.verified = true
+ LIMIT 15;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;pre&gt;&lt;code&gt;+---------------------+----------------+-------------------------------------------------+
+|      Tweet Id       |  Screen Name   |                    Hashtags                     |
++---------------------+----------------+-------------------------------------------------+
+| 663858238757199873  | FinishLine     | {&amp;quot;indices&amp;quot;:[116,132],&amp;quot;text&amp;quot;:&amp;quot;TheFundamentals&amp;quot;}  |
+| 663858343581237248  | antena3com     | {&amp;quot;indices&amp;quot;:[82,97],&amp;quot;text&amp;quot;:&amp;quot;MarDePlástico8&amp;quot;}     |
+| 663858351978078208  | tacobell       | {&amp;quot;indices&amp;quot;:[12,28],&amp;quot;text&amp;quot;:&amp;quot;TacoEmojiEngine&amp;quot;}    |
+| 663858351990697984  | tacobell       | {&amp;quot;indices&amp;quot;:[14,30],&amp;quot;text&amp;quot;:&amp;quot;TacoEmojiEngine&amp;quot;}    |
+| 663858553329815553  | CollegeHumor   | {&amp;quot;indices&amp;quot;:[0,14],&amp;quot;text&amp;quot;:&amp;quot;TheCrunchBowl&amp;quot;}       |
+| 663858746251042816  | tacobell       | {&amp;quot;indices&amp;quot;:[12,28],&amp;quot;text&amp;quot;:&amp;quot;TacoEmojiEngine&amp;quot;}    |
+| 663859039831486465  | VctorClavijo   | {&amp;quot;indices&amp;quot;:[14,23],&amp;quot;text&amp;quot;:&amp;quot;Carlos10&amp;quot;}           |
+| 663859115358158848  | FarnamHorse    | {&amp;quot;indices&amp;quot;:[0,11],&amp;quot;text&amp;quot;:&amp;quot;DidYouKnow&amp;quot;}          |
+| 663859161503928320  | vpelham        | {&amp;quot;indices&amp;quot;:[20,29],&amp;quot;text&amp;quot;:&amp;quot;feminist&amp;quot;}           |
+| 663859161503928320  | vpelham        | {&amp;quot;indices&amp;quot;:[127,136],&amp;quot;text&amp;quot;:&amp;quot;feminism&amp;quot;}         |
+| 663859312469651456  | AlPrimerToque  | {&amp;quot;indices&amp;quot;:[0,18],&amp;quot;text&amp;quot;:&amp;quot;LorenzoEnOndaCero&amp;quot;}   |
+| 663859425715834880  | NewsTalk770    | {&amp;quot;indices&amp;quot;:[82,91],&amp;quot;text&amp;quot;:&amp;quot;yycroads&amp;quot;}           |
+| 663859425715834880  | NewsTalk770    | {&amp;quot;indices&amp;quot;:[92,103],&amp;quot;text&amp;quot;:&amp;quot;yyctraffic&amp;quot;}        |
+| 663859471844810752  | BrentASJax     | {&amp;quot;indices&amp;quot;:[70,83],&amp;quot;text&amp;quot;:&amp;quot;FirstAlertWX&amp;quot;}       |
+| 663859530598514688  | simpsonwhnt    | {&amp;quot;indices&amp;quot;:[102,111],&amp;quot;text&amp;quot;:&amp;quot;valleywx&amp;quot;}         |
++---------------------+----------------+-------------------------------------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;You can probably guess where I’m heading by now. A &lt;code&gt;COUNT()&lt;/code&gt; and &lt;code&gt;GROUP BY&lt;/code&gt; on a table like this can give us the number
+hashtags in each tweet. So let’s make a temporary reference to this query’s output with Drill’s &amp;lsquo;view&amp;rsquo; functionality. To
+do this we switch to the local file system’s temporary workspace and then run a CREATE VIEW command:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-sql&#34;&gt;&amp;gt; USE dfs.tmp;
+&amp;gt; CREATE VIEW hashtags AS SELECT tw.id `Tweet Id`, tw.`user`.screen_name `Screen Name`, FLATTEN(tw.entities.hashtags) `Hashtags` FROM dfs.`/path/to/tweets.small.json` tw WHERE tw.entities.hashtags[0].text IS NOT NULL AND tw.`user`.verified = true;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And now we’re ready to query our &amp;lsquo;hashtags&amp;rsquo; view to sort verified tweets by the number of hashtags.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-sql&#34;&gt;  SELECT `Tweet Id`, `Screen Name`, COUNT(`Tweet Id`) `Num Hashtags`
+    FROM hashtags
+GROUP BY `Tweet Id`, `Screen Name`
+ORDER BY `Num Hashtags` DESC
+   LIMIT 15;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;pre&gt;&lt;code&gt;+---------------------+------------------+---------------+
+|      Tweet Id       |   Screen Name    | Num Hashtags  |
++---------------------+------------------+---------------+
+| 663860369459384320  | SOFIALAMA        | 4             |
+| 663861480945664004  | ChrisMillerKUTV  | 3             |
+| 663861938103930880  | XboxFR           | 3             |
+| 663862705674133504  | sputnik_TR       | 2             |
+| 663862542079557633  | WHO              | 2             |
+| 663862743427076096  | ljcisneros       | 2             |
+| 663861338310053888  | joelcomm         | 2             |
+| 663859161503928320  | vpelham          | 2             |
+| 663861027948249088  | joemaalouftv     | 2             |
+| 663859425715834880  | NewsTalk770      | 2             |
+| 663861791303274497  | DezMandamentos   | 2             |
+| 663860684006952960  | RogerCookMLA     | 2             |
+| 663859799004581888  | DPostSports      | 1             |
+| 663859702535553024  | PrimerImpacto    | 1             |
+| 663859039831486465  | VctorClavijo     | 1             |
++---------------------+------------------+---------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Ta da!&lt;/p&gt;
+
+&lt;p&gt;But views aren’t just for simplifying SQL statements. For instance, you could also employ a view to create a shortcut to
+a query that joins several different files and/or databases. And since views only store queries and not data, you can
+make a lot of them without worrying about consuming the amount of disk space associated with table creation.&lt;/p&gt;
+
+&lt;p&gt;So to recap: In this post I&amp;rsquo;ve showcased how to deal with complicated nested JSON data in Drill, while also
+demonstrating how a &amp;lsquo;view&amp;rsquo; can improve the flow and readability of your analysis.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

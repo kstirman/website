@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Running SQL Queries on CSV Files Using Apache Drill</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Running SQL Queries on CSV Files Using Apache Drill</h1>
+          <h4>by Nathan Griffith on 2015-10-13</h4>
+          <p>If you find a large data store on the web that you&rsquo;re interested in, chances are good that it&rsquo;ll be available for
+download as a dump to a CSV file. The CSV format definitely isn&rsquo;t the most sophisticated data storage method around, but
+it&rsquo;s common, relatively intuitive for humans to read, and simple to import and export from spreadsheet software like
+Excel and LibreOffice. Many of us, however, might want to quickly integrate a CSV data set with an existing database
+system (like Hadoop or MongoDB) that&rsquo;s already in place. Or, you may simply prefer to have an SQL interface to the data
+instead of suffering through an officeware GUI. In both these cases, Apache Drill is the answer.</p>
+
+<p>For this article I&rsquo;ll focus on the second use scenario as implemented on a single machine running OS X. The data I&rsquo;ll be
+looking at comes from a CSV dump of the confirmed planets from NASA&rsquo;s Exoplanet Archive, which is freely available via
+<a href="http://exoplanetarchive.ipac.caltech.edu">this site</a>.</p>
+
+<p>To get started, we&rsquo;ll need to install Apache Drill. First, go download and install the Java SE SD Development Kit if you
+don&rsquo;t already have it. Then open a terminal and download Drill using the following command</p>
+
+<pre><code>$ curl -o apache-drill.tar.gz http://getdrill.org/drill/download/apache-drill-1.1.0.tar.gz
+</code></pre>
+
+<p>Next make an install folder (in this case we&rsquo;re placing it in the home directory)</p>
+
+<pre><code>$ mkdir ~/apache-drill
+</code></pre>
+
+<p>and then unpack the file and move the resulting directory&rsquo;s contents to the install location</p>
+
+<pre><code>$ tar xzvf apache-drill-1.1.0.tar.gz
+$ mv apache-drill-1.1.0/* ~/apache-drill
+$ rm -rf apache-drill-1.1.0
+</code></pre>
+
+<p>Now it&rsquo;s easy to launch the single-machine version of Apache Drill with</p>
+
+<pre><code>$ ~/apache-drill/bin/drill-embedded
+</code></pre>
+
+<p>From here on out we&rsquo;ll be playing with the file &lsquo;planets.csv&rsquo; that we downloaded from the NASA site. Before the real
+number-crunching fun begins, however, you&rsquo;ll need to comment out line 382 of the file (assuming you dumped all of the
+columns available). This just hides the names of each field, which would only get in the way since Apache Drill
+currently deals directly with the column numbers of a CSV file (this may change in a future release).</p>
+
+<p>Let&rsquo;s test things out with this simple query that shows the number of planets in 10 star systems from the data set:</p>
+
+<pre><code>&gt; SELECT columns[1] AS `system name`, columns[4] AS `number of planets` FROM dfs.`/Users/nategri/dremio/playdata/planets.csv` LIMIT 20;
++----------------------------+--------------------+
+|        system name         | number of planets  |
++----------------------------+--------------------+
+| 11 Com                     | 1                  |
+| 11 UMi                     | 1                  |
+| 14 And                     | 1                  |
+| 14 Her                     | 1                  |
+| 16 Cyg B                   | 1                  |
+| 18 Del                     | 1                  |
+| 1RXS J160929.1-210524      | 1                  |
+| 24 Sex                     | 2                  |
+| 24 Sex                     | 2                  |
+| 2MASS J01225093-2439505    | 1                  |
+| 2MASS J02192210-3925225    | 1                  |
+| 2MASS J04414489+2301513    | 1                  |
+| 2MASS J12073346-3932539    | 1                  |
+| 2MASS J19383260+4603591    | 1                  |
+| 2MASS J21402931+1625183 A  | 1                  |
+| 30 Ari B                   | 1                  |
+| 4 UMa                      | 1                  |
+| 42 Dra                     | 1                  |
+| 47 UMa                     | 3                  |
+| 47 UMa                     | 3                  |
++----------------------------+--------------------+
+20 rows selected (0.141 seconds)
+</code></pre>
+
+<p>Our solar system has 8 planets, but it seems like a lot of these only have 1 or 2. Let&rsquo;s run another query to get
+the average number of planets (note: I&rsquo;m using CAST here to convert the strings to floats).</p>
+
+<pre><code>&gt; SELECT AVG(CAST(columns[4] AS float)) AS `avg num of planets` FROM dfs.`/Users/nategri/dremio/playdata/planets.csv`;
++---------------------+
+| avg num of planets  |
++---------------------+
+| 2.134249471458774   |
++---------------------+
+1 row selected (0.15 seconds)
+
+</code></pre>
+
+<p>Yes, that is certainly far less than 8. So is our solar system a freak? Well, probably not. It&rsquo;s easy to imagine that
+bigger planets are simply easier to detect, and if this is the case (spoiler: this definitely the case) then the average
+mass of planets in systems with only one detected body ought to be quite a bit bigger than those with more. We can test
+our &ldquo;hypothesis&rdquo; (that we know to be true) a with a more complex query:</p>
+
+<pre><code>&gt; SELECT columns[4] AS `num planets`, AVG(CAST(columns[101] AS float)) AS `avg planet mass`, COUNT(DISTINCT columns[1]) AS `num star systems` FROM dfs.`/Users/nategri/dremio/playdata/planets.csv` WHERE columns[101] &lt;&gt; '' GROUP BY &gt; columns[4] ORDER BY CAST(columns[4] AS float);
++--------------+---------------------+-------------------+
+| num planets  |   avg planet mass   | num star systems  |
++--------------+---------------------+-------------------+
+| 1            | 954.3903533472983   | 332               |
+| 2            | 631.1303849087407   | 50                |
+| 3            | 460.048579923199    | 24                |
+| 4            | 542.5327862175182   | 11                |
+| 5            | 158.82839210055494  | 8                 |
+| 6            | 7.8500000437100725  | 1                 |
++--------------+---------------------+-------------------+
+6 rows selected (0.801 seconds)
+</code></pre>
+
+<p>Indeed, systems with one detected planet dominate the data set, and the average mass of their planets (in units of
+Jupiter masses) is <em>far</em> higher than that of systems with more planets. Apache Drill is amazing for exactly this kind of
+work: spotting and verifying features in found data sets in a rapid, interactive fashion.</p>
+
+<p>Anyway that&rsquo;s it for this tutorial. Happy Drilling!</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

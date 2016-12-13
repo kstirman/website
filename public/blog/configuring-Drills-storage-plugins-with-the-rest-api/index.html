@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Configuring Drill&#39;s storage plugins with the REST API</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Configuring Drill&#39;s storage plugins with the REST API</h1>
+          <h4>by Nathan Griffith on 2015-12-02</h4>
+          <p>The Web Console of Apache Drill is an intuitive configuration tool, but it&rsquo;s easy to imagine scenarios where connecting
+to a Drill instance via a browser isn&rsquo;t desirable or even possible (e.g. within a script or in a high security
+environment).</p>
+
+<p>So if you find yourself needing to set up a Drill storage plugin in such a situation, what should you do? Well, in cases
+like this Drill&rsquo;s built-in REST API comes to the rescue.</p>
+
+<p>As demonstrated in the following Python script, setting up a new plugin (in this case one for HDFS) is a pretty simple
+operation when performed via the REST interface:</p>
+
+<pre><code class="language-python">import httplib
+import json
+
+# Create a connection to the local instance of Drill
+drillRestConn = httplib.HTTPConnection(&quot;localhost:8047&quot;)
+
+# First GET standard 'dfs' plugin via REST
+drillRestConn.request(&quot;GET&quot;,&quot;/storage/dfs.json&quot;)
+drillRestResponse = drillRestConn.getresponse()
+storageDict = json.loads(drillRestResponse.read())
+
+# Now modify it into one for HDFS
+storageDict[&quot;name&quot;] = &quot;hdfs&quot;
+storageDict[&quot;config&quot;][&quot;connection&quot;] = &quot;hdfs://&lt;ADDRESS OF HDFS NAMENODE&gt;:8020&quot;
+storageJson = json.dumps(storageDict)
+
+# Then POST it back via REST
+pluginHeader = {&quot;Content-Type&quot;: &quot;application/json&quot;}
+drillRestConn.request(&quot;POST&quot;, &quot;/storage/hdfs.json&quot;, storageJson, pluginHeader)
+drillRestReponse = drillRestConn.getresponse()
+</code></pre>
+
+<p>(This code is based on a portion of the EMR bootstrap script indicated in <a href="http://www.dremio.com/blog/bootstrapping-an-interactive-sql-environment-on-amazon-emr/">this
+post</a>.)</p>
+
+<p>Notice how the first endpoint I use is labeled by the name of an existing plugin that I&rsquo;d like information about (in
+this case &lsquo;dfs&rsquo; which is the name of the default plugin for the local filesystem). This information is returned in the
+form of a JSON string which starts out like:</p>
+
+<pre><code>{
+  &quot;name&quot; : &quot;dfs&quot;,
+  &quot;config&quot; : {
+    &quot;type&quot; : &quot;file&quot;,
+    &quot;enabled&quot; : true,
+    &quot;connection&quot; : &quot;file:///&quot;,
+    &quot;workspaces&quot; : {
+      &quot;root&quot; : {
+        &quot;location&quot; : &quot;/&quot;,
+        &quot;writable&quot; : false,
+        &quot;defaultInputFormat&quot; : null
+      },
+      &quot;tmp&quot; : {
+        &quot;location&quot; : &quot;/tmp&quot;,
+        &quot;writable&quot; : true,
+        &quot;defaultInputFormat&quot; : null
+      }
+    },
+    ... etc
+</code></pre>
+
+<p>To change this plugin to reference an HDFS store, all I have to do is edit the JSON so that the &ldquo;name&rdquo; and then the
+&ldquo;connection&rdquo; key (located under &ldquo;config&rdquo;) have appropriate values. Once that&rsquo;s done I can POST the modified
+configuration JSON back to Drill, using the name of the new plugin that I&rsquo;d like to create as the label of the endpoint.</p>
+
+<p>So if you find yourself browserless and in need of some Drill plugin configuration&mdash;don&rsquo;t despair! You&rsquo;re only a
+couple REST requests away from a console-based solution.</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/install/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/install/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Installing Apache Drill on Microsoft Windows</title>
+      <link>/kstirman.github.io/bookshelf/blog/installing-Apache-Drill-on-Microsoft-Windows/</link>
+      <pubDate>Tue, 08 Dec 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/installing-Apache-Drill-on-Microsoft-Windows/</guid>
+      <description>&lt;p&gt;Many of my previous articles on the Dremio Blog have assumed that you&amp;rsquo;d be using Apache Drill from within some flavor of
+unix (namely either Linux or OS X), but it&amp;rsquo;s completely possible to install Drill on Microsoft Windows as well. In this
+post I&amp;rsquo;ll cover how to install and run a single-machine instance of Drill on Windows Server 2012 R2.&lt;/p&gt;
+
+&lt;p&gt;Just like the unix versions, you&amp;rsquo;ll need to have the Java Development Kit installed to run Drill. You can grab JDK
+version 7 from &lt;a href=&#34;http://www.oracle.com/technetwork/java/javase/downloads/jdk7-downloads-1880260.html&#34;&gt;this site&lt;/a&gt;. You&amp;rsquo;ll
+also need some way to uncompress the &lt;code&gt;.tar.gz&lt;/code&gt; file extension that Drill comes packaged in. The open source Windows
+utility &lt;a href=&#34;http://www.7-zip.org/&#34;&gt;7-Zip&lt;/a&gt; is a popular choice for this task. (Note: You will need to &amp;lsquo;unzip&amp;rsquo; the Drill file
+twice&amp;mdash;once to kill the &amp;lsquo;.gz&amp;rsquo; extension and another time to get rid of the &amp;lsquo;.tar&amp;rsquo;).&lt;/p&gt;
+
+&lt;p&gt;Before we run Drill we need to set up some environment variables in Windows. In Windows Server 2012, you can edit these
+by opening the Control Panel, hitting &amp;lsquo;System and Security&amp;rsquo;, &amp;lsquo;System,&amp;rsquo; and then &amp;lsquo;Advanced system settings&amp;rsquo; on the
+left. Finally, head to the &amp;lsquo;Advanced&amp;rsquo; tab in this new window and click the &amp;lsquo;Environment Variables&amp;hellip;&amp;rsquo; button.&lt;/p&gt;
+
+&lt;p&gt;&lt;br&gt;
+&lt;br&gt;
+&lt;p style=&#34;text-align: center;&#34;&gt;
+&lt;img style=&#34;max-width: 100%;&#34; src=&#34;kstirman.github.io/bookshelf/img/windows_env.png&#34;&gt;
+&lt;/p&gt;
+&lt;p style=&#34;text-align: center; font-style: italic;&#34;&gt;Configuring environment variables in Windows Server 2012.&lt;/p&gt;
+&lt;br&gt;
+&lt;br&gt;&lt;/p&gt;
+
+&lt;p&gt;Now we need to create a new user variable, so hit &amp;lsquo;New&amp;hellip;&amp;rsquo; under the first list and put in a variable name of
+&lt;code&gt;JAVA_HOME&lt;/code&gt; with a value that indicates the directory of your Java install (in my case: &amp;lsquo;C:\Program
+Files\Java\jdk1.7.0_79&amp;rsquo;). Next we&amp;rsquo;ll edit the value of the &lt;code&gt;Path&lt;/code&gt; variable in the &amp;lsquo;System variables&amp;rsquo; list by adding a
+semi-colon followed by &amp;lsquo;C:\Program Files\Java\jdk1.7.0_79\bin&amp;rsquo;.&lt;/p&gt;
+
+&lt;p&gt;Almost there! Open a Command Prompt window and cd to the &amp;lsquo;bin&amp;rsquo; directory where you unpacked Drill. Now type the
+following command:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;sqlline.bat -u &amp;quot;jdbc:drill:zk=local&amp;quot;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;and you should be presented with a standard single-machine Drill session.&lt;/p&gt;
+
+&lt;p&gt;Drill is just as easy to use on Windows as it is on unix, and you can look forward to more Windows-focused content on
+the Dremio Blog real soon!&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

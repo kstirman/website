@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/files/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/files/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Using a SQL JOIN on two CSV files</title>
+      <link>/kstirman.github.io/bookshelf/blog/using-a-SQL-join-on-two-CSV-files/</link>
+      <pubDate>Tue, 19 Jan 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/using-a-SQL-join-on-two-CSV-files/</guid>
+      <description>&lt;p&gt;One of Drill&amp;rsquo;s great strengths is its ability to unite sets of information found in different places. In today&amp;rsquo;s article
+I&amp;rsquo;ll provide a quick example of this functionality by showing you how to you use Drill to quickly improve the interface
+to some found data.&lt;/p&gt;
+
+&lt;p&gt;We&amp;rsquo;ll start with the interesting but strangely formatted business-centered census data that we used in the &lt;a href=&#34;http://www.dremio.com/blog/converting-csv-file-data-to-kudu-storage/&#34;&gt;last
+post&lt;/a&gt; (available on
+&lt;a href=&#34;https://www.census.gov/econ/cbp/download/&#34;&gt;this site&lt;/a&gt; as a 14.3 MB zip file). As you&amp;rsquo;ll recall, our command to query
+the state, county, and industry codes, along with the number of establishments, yielded results in the following format:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;+-----------+----------+---------+------+
+| fipstate  | fipscty  |  naics  | est  |
++-----------+----------+---------+------+
+| 55        | 107      | 321113  | 1    |
+| 48        | 185      | 51213/  | 1    |
+| 39        | 135      | 42491/  | 6    |
+| 04        | 027      | 4411//  | 30   |
+| 08        | 085      | 541870  | 1    |
+| 26        | 061      | 51----  | 17   |
+| 28        | 049      | 519///  | 3    |
+| 48        | 139      | 48849/  | 3    |
+| 22        | 073      | 4853//  | 3    |
+| 48        | 139      | 424910  | 10   |
++-----------+----------+---------+------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;It&amp;rsquo;s great to have data with this level of granularity, but the FIPS codes that the file uses to identify the state and
+county are far from intuitive. Thankfully we can use Drill in combination with this &lt;a href=&#34;https://github.com/hadley/data-counties/blob/master/county-fips.csv&#34;&gt;lovely CSV
+file&lt;/a&gt; from Github user &amp;lsquo;hadley&amp;rsquo; to make the data
+more user-friendly. (Remember to rename both files as &amp;lsquo;.csvh&amp;rsquo; so Drill knows to pick up the column names!)&lt;/p&gt;
+
+&lt;p&gt;Because Drill effectively treats each file as a separate table, we can gain access to human readable state and county
+names by performing an SQL JOIN across the files.&lt;/p&gt;
+
+&lt;p&gt;That handy file from Github has a format like&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;+-----------------------+--------+--------------+-------------+
+|        county         | state  | county_fips  | state_fips  |
++-----------------------+--------+--------------+-------------+
+| Aleutians East        | AK     | 13           | 2           |
+| Aleutians West        | AK     | 16           | 2           |
+| Anchorage             | AK     | 20           | 2           |
+| Bethel                | AK     | 50           | 2           |
+| Bristol Bay           | AK     | 60           | 2           |
+| Denali                | AK     | 68           | 2           |
+| Dillingham            | AK     | 70           | 2           |
+| Fairbanks North Star  | AK     | 90           | 2           |
+| Haines                | AK     | 100          | 2           |
+| Juneau                | AK     | 110          | 2           |
++-----------------------+--------+--------------+-------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;so a simple query that brings state and county names to the census data using a JOIN is:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;  SELECT t2.state, t2.county, SUM(CAST(t1.est AS INT)) `total establishments`
+    FROM dfs.`/path/to/cbp13co.csvh` t1
+    JOIN dfs.`/path/to/county-fips.csvh` t2
+      ON t1.fipstate = t2.state_fips
+     AND t1.fipscty = t2.county_fips
+GROUP BY t2.state, t2.county
+ORDER BY `total establishments`
+    DESC LIMIT 10;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Which, for the curious, produces the following output:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;+--------+--------------+-----------------------+
+| state  |    county    | total establishments  |
++--------+--------------+-----------------------+
+| TX     | Harris       | 571756                |
+| TX     | Dallas       | 374670                |
+| NY     | Suffolk      | 291970                |
+| TX     | Tarrant      | 232484                |
+| MI     | Oakland      | 230154                |
+| GA     | Fulton       | 203028                |
+| MI     | Wayne        | 190806                |
+| NY     | Westchester  | 189820                |
+| TX     | Travis       | 186236                |
+| MO     | St. Louis    | 184326                |
++--------+--------------+-----------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Cool! (And, no, I have no idea why Harris county, Texas is apparently the business capitol of the United States.)&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Tuning Parquet file performance</title>
+      <link>/kstirman.github.io/bookshelf/blog/tuning-Parquet-file-performance/</link>
+      <pubDate>Sun, 13 Dec 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/tuning-Parquet-file-performance/</guid>
+      <description>&lt;p&gt;Today I&amp;rsquo;d like to pursue a brief discussion about how changing the size of a Parquet file&amp;rsquo;s &amp;lsquo;row group&amp;rsquo; to match a file
+system&amp;rsquo;s block size can effect the efficiency of read and write performance. This tweak can be especially important on
+HDFS environments in which I/O is intrinsically tied to network operations. (Note: If you&amp;rsquo;d first like to learn about
+Parquet in a less &amp;lsquo;nuts and bolts&amp;rsquo; manner, let me recommend &lt;a href=&#34;http://www.dremio.com/blog/sql-and-parquet-a-simple-demo/&#34;&gt;this
+post&lt;/a&gt; in which I provide a simple demo of the format using
+Apache Drill).&lt;/p&gt;
+
+&lt;p&gt;To understand why the &amp;lsquo;row group&amp;rsquo; size matters, it might be useful to first understand what the heck a &amp;lsquo;row group&amp;rsquo; is.
+For this let&amp;rsquo;s refer to Figure 1, which is a simple illustration of the Parquet file format.&lt;/p&gt;
+
+&lt;p&gt;&lt;br&gt;
+&lt;br&gt;
+&lt;p style=&#34;text-align: center;&#34;&gt;
+&lt;img style=&#34;max-width: 100%;&#34; src=&#34;kstirman.github.io/bookshelf/img/parquet_block1.png&#34;&gt;
+&lt;/p&gt;
+&lt;p style=&#34;text-align: center; font-style: italic;&#34;&gt;Figure 1: The basic anatomy of a Parquet file. The left file contains
+one row group, while the right is comprised of several.&lt;/p&gt;
+&lt;br&gt;
+&lt;br&gt;&lt;/p&gt;
+
+&lt;p&gt;As you can see, a row group is a segment of the Parquet file that holds serialized (and compressed!) arrays of column
+entries. Since bigger row groups mean longer continuous arrays of column data (which is the whole point of Parquet!),
+bigger row groups are generally good news if you want faster Parquet file operations.&lt;/p&gt;
+
+&lt;p&gt;But how does the block size of the disk come into play? Let&amp;rsquo;s look at Figure 2, which explores three different Parquet
+storage scenarios for an HDFS file system. In Scenario A, very large Parquet files are stored using large row groups.
+The large row groups are good for executing efficient column-based manipulations, but the groups and files are prone to
+spanning multiple disk blocks, which risks latency by invoking I/O operations. In Scenario B, small files are stored
+using a single small row group. This mitigates the number of block crossings, but reduces the efficacy of Parquet&amp;rsquo;s
+columnar storage format.&lt;/p&gt;
+
+&lt;p&gt;&lt;br&gt;
+&lt;br&gt;
+&lt;p style=&#34;text-align: center;&#34;&gt;
+&lt;img style=&#34;max-width: 100%;&#34; src=&#34;kstirman.github.io/bookshelf/img/parquet_block2.png&#34;&gt;
+&lt;/p&gt;
+&lt;p style=&#34;text-align: center; font-style: italic;&#34;&gt;Figure 2: Three different Parquet storage scenarios for an HDFS file
+system.&lt;/p&gt;
+&lt;br&gt;
+&lt;br&gt;&lt;/p&gt;
+
+&lt;p&gt;An ideal situation is demonstrated in Scenario C, in which one large Parquet file with one large row group is stored in
+one large disk block. This minimizes I/O operations, while maximizing the length of the stored columns. The &lt;a href=&#34;https://parquet.apache.org/documentation/latest/&#34;&gt;official
+Parquet documentation&lt;/a&gt; recommends a disk block/row group/file size of
+512 to 1024 MB on HDFS.&lt;/p&gt;
+
+&lt;p&gt;In Apache Drill, you can change the row group size of the Parquet files it writes by using the &lt;code&gt;ALTER SYSTEM SET&lt;/code&gt;
+command on the &lt;code&gt;store.parquet.block-size&lt;/code&gt; variable. For instance to set a row group size of 1 GB, you would enter:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;ALTER SYSTEM SET `store.parquet.block-size` = 1073741824;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;(Note: larger block sizes will also require more memory to manage.)&lt;/p&gt;
+
+&lt;p&gt;Parquet and Drill are already extremely well integrated when it comes to data access and storage&amp;mdash;this tweak just
+enhances an already potent symbiosis!&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>SQL and Parquet: A simple demo</title>
+      <link>/kstirman.github.io/bookshelf/blog/SQL-and-Parquet-a-simple-demo/</link>
+      <pubDate>Tue, 01 Dec 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/SQL-and-Parquet-a-simple-demo/</guid>
+      <description>&lt;p&gt;For data wranglers wishing to store large amounts of text or numeric entries in an efficient fashion, the Apache Parquet
+file format makes for an obvious choice. As a storage medium, Parquet has two important benefits afforded by its
+columnar structure: 1.) Access to data columns can be made on an &amp;lsquo;as needed&amp;rsquo; basis, increasing the overall speed of
+queries, and 2.) Since all values in a column are serialized and compressed together, Parquet files take up much less
+room than similar plain text or row-wise compressed files.&lt;/p&gt;
+
+&lt;p&gt;In this article I&amp;rsquo;ll run through a simple SQL manipulation enabled by Apache Drill which results in the creation of data
+stored in Parquet format. Drill&amp;rsquo;s support for Parquet runs deep, and it&amp;rsquo;s the default storage format for files created
+as a result of a CTAS (CREATE TABLE&amp;hellip; AS) command.&lt;/p&gt;
+
+&lt;p&gt;We&amp;rsquo;ll start by downloading some parking data from the city of Aarhus, Denmark (available via &lt;a href=&#34;http://iot.ee.surrey.ac.uk:8080/datasets.html&#34;&gt;this
+site&lt;/a&gt;), renaming the file so that it has a &amp;lsquo;.csvh&amp;rsquo; extention (as per
+&lt;a href=&#34;http://www.dremio.com/blog/sql-queries-on-csv-files-with-column-headers/&#34;&gt;this article&lt;/a&gt;). Then we&amp;rsquo;ll start the Drill
+prompt with the usual incantation (&lt;code&gt;drill-embedded&lt;/code&gt; for single-machine or &lt;code&gt;drill-conf&lt;/code&gt; on a cluster) and do a simple
+&lt;code&gt;SELECT *&lt;/code&gt; to look at the data:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT * FROM dfs.`/path/to/aarhus_parking.csvh` LIMIT 10;
++---------------+--------------------------+------+--------------+----------------+----------------------+
+| vehiclecount  |        updatetime        | _id  | totalspaces  |   garagecode   |      streamtime      |
++---------------+--------------------------+------+--------------+----------------+----------------------+
+| 0             | 2014-05-22 09:09:04.145  | 1    | 65           | NORREPORT      | 2014-11-03 16:18:44  |
+| 0             | 2014-05-22 09:09:04.145  | 2    | 512          | SKOLEBAKKEN    | 2014-11-03 16:18:44  |
+| 869           | 2014-05-22 09:09:04.145  | 3    | 1240         | SCANDCENTER    | 2014-11-03 16:18:44  |
+| 22            | 2014-05-22 09:09:04.145  | 4    | 953          | BRUUNS         | 2014-11-03 16:18:44  |
+| 124           | 2014-05-22 09:09:04.145  | 5    | 130          | BUSGADEHUSET   | 2014-11-03 16:18:44  |
+| 106           | 2014-05-22 09:09:04.145  | 6    | 400          | MAGASIN        | 2014-11-03 16:18:44  |
+| 115           | 2014-05-22 09:09:04.145  | 7    | 210          | KALKVAERKSVEJ  | 2014-11-03 16:18:44  |
+| 233           | 2014-05-22 09:09:04.145  | 8    | 700          | SALLING        | 2014-11-03 16:18:44  |
+| 0             | 2014-05-22 09:39:01.803  | 9    | 65           | NORREPORT      | 2014-11-03 16:18:44  |
+| 0             | 2014-05-22 09:39:01.803  | 10   | 512          | SKOLEBAKKEN    | 2014-11-03 16:18:44  |
++---------------+--------------------------+------+--------------+----------------+----------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Before we save this table as a Parquet file, we need to switch to a writable workspace inside Drill. The command&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;USE dfs.tmp;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;will do the trick&amp;mdash;it tells Drill to write files to the system&amp;rsquo;s /tmp directory. With that done all we need to do
+is run a CTAS&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE TABLE parking AS SELECT * FROM dfs.`/path/to/aarhus_parking.csvh`;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;and then rename the resulting temporary file:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;mv /tmp/parking/0_0_0.parquet /path/to/parking.parquet
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now we can query the new Parquet file with:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;SELECT * FROM dfs.`/path/to/parking.parquet` LIMIT 10;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;which yields the same results as before. But what about file size? How does the compressed Parquet file compare to the
+original CSV? Pretty darn favorably, as it turns out:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ ls -lrth
+total 8488
+-rw-r--r--  1 user  staff   594K Nov 30 15:06 parking.parquet
+-rw-r-----@ 1 user  staff   3.6M Nov 30 15:07 aarhus_parking.csvh
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;In round numbers, it&amp;rsquo;s about 1/6th the size!&lt;/p&gt;
+
+&lt;p&gt;So that&amp;rsquo;s an extremely brief tour of how easily Drill interfaces with the Parquet file format. Since the two are an
+extremely popular combination, expect to see some more in-depth articles about using Drill with Parquet on the Dremio
+Blog in the near future.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>SQL queries on CSV files with column headers</title>
+      <link>/kstirman.github.io/bookshelf/blog/SQL-queries-on-CSV-files-with-column-headers/</link>
+      <pubDate>Mon, 23 Nov 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/SQL-queries-on-CSV-files-with-column-headers/</guid>
+      <description>&lt;p&gt;A new feature of Drill 1.3.0 is the ability to query CSV files using the column names listed in the file&amp;rsquo;s header.&lt;/p&gt;
+
+&lt;p&gt;As an example, let&amp;rsquo;s look at &lt;a href=&#34;http://introcs.cs.princeton.edu/java/data/olympic-medals2012.csv&#34;&gt;this CSV formatted file&lt;/a&gt;
+of countries that participated in the 2012 Summer Olympics. Before we begin, rename the file so that it ends in &amp;lsquo;.csvh&amp;rsquo;
+instead of &amp;lsquo;.csv&amp;rsquo;. The extension change tells Drill to parse the header of the CSV file, which means we can use the
+in-file identifiers for column names when we construct our queries.&lt;/p&gt;
+
+&lt;p&gt;So now we can ask for the 10 countries with the most medals by entering:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT `Country.name` AS Country, CAST(Total AS INT) `Total Medals` FROM dfs.`/path/to/olympic-medals2012.csvh` ORDER BY `Total Medals` DESC LIMIT 10;
++--------------+---------------+
+|   Country    | Total Medals  |
++--------------+---------------+
+| US           | 104           |
+| China        | 88            |
+| Russia       | 82            |
+| UK           | 65            |
+| Germany      | 44            |
+| Japan        | 38            |
+| Australia    | 35            |
+| France       | 34            |
+| Italy        | 28            |
+| South Korea  | 28            |
++--------------+---------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;We can also enable header parsing for any extension (including regular .csv files) by using the Drill Web Console to
+edit the JSON of a storage plugin. You can open the console by running &amp;lsquo;drill-embedded&amp;rsquo; and going to
+&lt;a href=&#34;http://localhost:8047&#34;&gt;http://localhost:8047&lt;/a&gt; in a browser. Once you&amp;rsquo;ve loaded the page, go to &amp;ldquo;Storage&amp;rdquo; at the top and click &amp;ldquo;Update&amp;rdquo; next to
+(for example) the &amp;lsquo;dfs&amp;rsquo; plugin for the local file system. To enable header parsing for a file type we need to add the
+key-value pair &lt;code&gt;&amp;quot;extractHeader&amp;quot;: true&lt;/code&gt; to an entry in the &amp;ldquo;formats&amp;rdquo; section of the file. For instance, if we change the
+plugin so that tab separated (.tsv) files now have their headers read, then the section for that format would read:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;...
+    &amp;quot;tsv&amp;quot;: {
+      &amp;quot;type&amp;quot;: &amp;quot;text&amp;quot;.
+      &amp;quot;extensions&amp;quot;: [
+        &amp;quot;tsv&amp;quot;
+      ],
+      &amp;quot;extractHeader&amp;quot;: true,
+      &amp;quot;delimiter&amp;quot;: &amp;quot;\t&amp;quot;
+    },
+...
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Drill was &lt;em&gt;already&lt;/em&gt; an amazing tool for querying text files. But header parsing makes it even better!&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

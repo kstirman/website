@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> SQL and Parquet: A simple demo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>SQL and Parquet: A simple demo</h1>
+          <h4>by Nathan Griffith on 2015-12-01</h4>
+          <p>For data wranglers wishing to store large amounts of text or numeric entries in an efficient fashion, the Apache Parquet
+file format makes for an obvious choice. As a storage medium, Parquet has two important benefits afforded by its
+columnar structure: 1.) Access to data columns can be made on an &lsquo;as needed&rsquo; basis, increasing the overall speed of
+queries, and 2.) Since all values in a column are serialized and compressed together, Parquet files take up much less
+room than similar plain text or row-wise compressed files.</p>
+
+<p>In this article I&rsquo;ll run through a simple SQL manipulation enabled by Apache Drill which results in the creation of data
+stored in Parquet format. Drill&rsquo;s support for Parquet runs deep, and it&rsquo;s the default storage format for files created
+as a result of a CTAS (CREATE TABLE&hellip; AS) command.</p>
+
+<p>We&rsquo;ll start by downloading some parking data from the city of Aarhus, Denmark (available via <a href="http://iot.ee.surrey.ac.uk:8080/datasets.html">this
+site</a>), renaming the file so that it has a &lsquo;.csvh&rsquo; extention (as per
+<a href="http://www.dremio.com/blog/sql-queries-on-csv-files-with-column-headers/">this article</a>). Then we&rsquo;ll start the Drill
+prompt with the usual incantation (<code>drill-embedded</code> for single-machine or <code>drill-conf</code> on a cluster) and do a simple
+<code>SELECT *</code> to look at the data:</p>
+
+<pre><code>&gt; SELECT * FROM dfs.`/path/to/aarhus_parking.csvh` LIMIT 10;
++---------------+--------------------------+------+--------------+----------------+----------------------+
+| vehiclecount  |        updatetime        | _id  | totalspaces  |   garagecode   |      streamtime      |
++---------------+--------------------------+------+--------------+----------------+----------------------+
+| 0             | 2014-05-22 09:09:04.145  | 1    | 65           | NORREPORT      | 2014-11-03 16:18:44  |
+| 0             | 2014-05-22 09:09:04.145  | 2    | 512          | SKOLEBAKKEN    | 2014-11-03 16:18:44  |
+| 869           | 2014-05-22 09:09:04.145  | 3    | 1240         | SCANDCENTER    | 2014-11-03 16:18:44  |
+| 22            | 2014-05-22 09:09:04.145  | 4    | 953          | BRUUNS         | 2014-11-03 16:18:44  |
+| 124           | 2014-05-22 09:09:04.145  | 5    | 130          | BUSGADEHUSET   | 2014-11-03 16:18:44  |
+| 106           | 2014-05-22 09:09:04.145  | 6    | 400          | MAGASIN        | 2014-11-03 16:18:44  |
+| 115           | 2014-05-22 09:09:04.145  | 7    | 210          | KALKVAERKSVEJ  | 2014-11-03 16:18:44  |
+| 233           | 2014-05-22 09:09:04.145  | 8    | 700          | SALLING        | 2014-11-03 16:18:44  |
+| 0             | 2014-05-22 09:39:01.803  | 9    | 65           | NORREPORT      | 2014-11-03 16:18:44  |
+| 0             | 2014-05-22 09:39:01.803  | 10   | 512          | SKOLEBAKKEN    | 2014-11-03 16:18:44  |
++---------------+--------------------------+------+--------------+----------------+----------------------+
+</code></pre>
+
+<p>Before we save this table as a Parquet file, we need to switch to a writable workspace inside Drill. The command</p>
+
+<pre><code>USE dfs.tmp;
+</code></pre>
+
+<p>will do the trick&mdash;it tells Drill to write files to the system&rsquo;s /tmp directory. With that done all we need to do
+is run a CTAS</p>
+
+<pre><code>CREATE TABLE parking AS SELECT * FROM dfs.`/path/to/aarhus_parking.csvh`;
+</code></pre>
+
+<p>and then rename the resulting temporary file:</p>
+
+<pre><code>mv /tmp/parking/0_0_0.parquet /path/to/parking.parquet
+</code></pre>
+
+<p>Now we can query the new Parquet file with:</p>
+
+<pre><code>SELECT * FROM dfs.`/path/to/parking.parquet` LIMIT 10;
+</code></pre>
+
+<p>which yields the same results as before. But what about file size? How does the compressed Parquet file compare to the
+original CSV? Pretty darn favorably, as it turns out:</p>
+
+<pre><code>$ ls -lrth
+total 8488
+-rw-r--r--  1 user  staff   594K Nov 30 15:06 parking.parquet
+-rw-r-----@ 1 user  staff   3.6M Nov 30 15:07 aarhus_parking.csvh
+</code></pre>
+
+<p>In round numbers, it&rsquo;s about 1/6th the size!</p>
+
+<p>So that&rsquo;s an extremely brief tour of how easily Drill interfaces with the Parquet file format. Since the two are an
+extremely popular combination, expect to see some more in-depth articles about using Drill with Parquet on the Dremio
+Blog in the near future.</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

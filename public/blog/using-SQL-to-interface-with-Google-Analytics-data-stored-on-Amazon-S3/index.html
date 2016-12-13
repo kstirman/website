@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Using SQL to interface with Google Analytics data stored on Amazon S3</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Using SQL to interface with Google Analytics data stored on Amazon S3</h1>
+          <h4>by Nathan Griffith on 2015-10-20</h4>
+          
+
+<h2 id="introduction">Introduction</h2>
+
+<p>In the realm of web analytics, Google&rsquo;s presence remains formidable. And it&rsquo;s no surprise&mdash;as a free service with a
+brain-dead easy setup and a wide range of collected user information, Google Analytics has a lot going for it. But if
+you&rsquo;d like to move away from the standard Analytics web interface, what are your options? The intended audience for this
+article is those who might wish for a little more flexibility with their Google Analytics data.</p>
+
+<p>An excellent tool for accomplishing this flexibility is Apache Drill. Drill is a piece of open source software that&rsquo;s
+capable of providing a standard SQL command-line interface to a wide range of data types stored in a variety of ways. In
+this application we&rsquo;ll be using Drill to talk to some JSON data retrieved using the Google Analytics API and stored on
+Amazon S3.</p>
+
+<h2 id="accessing-the-google-analytics-api-from-python">Accessing the Google Analytics API from Python</h2>
+
+<p>Google Analytics can be interfaced via a number of different languages, but in this example we&rsquo;ll constrain ourselves
+to the Python API. The necessary files are easily installed via the Python package manager <code>pip</code> on the command line:</p>
+
+<pre><code>$ sudo pip install --upgrade google-api-python-client
+</code></pre>
+
+<p>The next step is to generate the credentials necessary to use the Google Analytics API from within a script. To do this
+log in to <a href="http://console.developers.google.com">console.developers.google.com</a> and create a new project. With your new project
+selected we need to first enable the Analytics API. Click on &ldquo;APIs&rdquo; under &ldquo;APIs &amp; auth&rdquo;, and then select &ldquo;Analytics API&rdquo;
+in the &ldquo;Advertising APIs&rdquo; grouping. In the page that shows up next, click &ldquo;Enable API.&rdquo; Now it&rsquo;s time to go to
+&ldquo;Credentials&rdquo; on the left column, and click &ldquo;Add credentials.&rdquo; Select &ldquo;Service account&rdquo; from the drop down, and &ldquo;P12&rdquo;
+before hitting the &ldquo;Create&rdquo; button.</p>
+
+<p>This action will download a <code>.p12</code> file to your computer that we&rsquo;ll need later for the script, and then forward you to a
+page with a listing of your service accounts. The email address you see in the left column will need to be added to your
+Google Analytics settings. Head over to <a href="http://analytics.google.com">analytics.google.com</a>, click &ldquo;Admin&rdquo; at the top, select
+&ldquo;User Management&rdquo; from the left, and then paste the email address you saw listed for your service account into the &ldquo;Add
+permissions for:&rdquo; box.  From here just click &ldquo;Add&rdquo; and you&rsquo;re done doing the web configuration necessary for making
+Google Analytics to work with a script.</p>
+
+<p><br>
+<br>
+<p style="text-align: center;">
+<img style="max-width: 100%;" src="/img/analytics.png">
+</p>
+<p style="text-align: center; font-style: italic;">You need to add the email associated with your service account to
+your Google Analytics in order to enable API access from the script.</p>
+<br>
+<br></p>
+
+<h2 id="using-amazon-s3-from-python">Using Amazon S3 from Python</h2>
+
+<p>The example script included in this article will do a couple different things: First, it exposes a specified set of
+Google Analytics data as a dump to a JSON file, and second, it uploads this dumped data to the cloud by way of Amazon
+S3.  In order for this second task to succeed, we also to need to ensure that the script has access to the necessary
+Amazon Web Services credentials by going to <a href="http://console.aws.amazon.com/iam/home">console.aws.amazon.com/iam/home</a>. On this
+page click &ldquo;Users&rdquo; on the left, and then select your username from the list that shows up. Then scroll down to the
+&ldquo;Security Credentials&rdquo; section and click the button that says &ldquo;Create Access Key.&rdquo; Next hit &ldquo;Download Credentials&rdquo; to
+retrieve a file called <code>credentials.csv</code>.  The values from this file need to be placed in <code>~/.aws/credentials</code> in the
+following way:</p>
+
+<pre><code>[default]
+aws_access_key_id = ACCESSKEYID_FROM_CREDENTIALS_CSV
+aws_secret_access_key = SECRETACCESSKEY_FROM_CREDENTIALS_CSV
+</code></pre>
+
+<p>Finally, you&rsquo;ll need to install the Python package necessary to access your S3 storage via a script:</p>
+
+<pre><code>pip install boto3
+</code></pre>
+
+<h2 id="example-python-script-for-dumping-google-analytics-to-s3">Example Python script for dumping Google Analytics to S3</h2>
+
+<p>Now we&rsquo;re finally ready to take a look at the example script, which I&rsquo;ve called <code>ga_dump.py</code>:</p>
+
+<pre><code class="language-python"># Portions of this code are based heavily on Google's HelloAnalytics.py exmaple:
+# https://developers.google.com/analytics/devguides/reporting/core/v3/quickstart/service-py
+# As such, this software is covered under the Apache 2.0 License:
+# http://www.apache.org/licenses/LICENSE-2.0
+
+import httplib2
+import sys
+import json
+
+import boto3
+
+from apiclient.discovery import build
+from oauth2client import client, file, tools
+from oauth2client.client import SignedJwtAssertionCredentials
+
+# Global variables that hold information relevant to your GA access
+ga_key_file_name = &quot;PATH TO YOUR .p12 KEY FILE FROM DEV CONSOLE&quot;
+ga_service_email = &quot;SERVICE EMAIL CREATED IN DEV CONSOLE&quot;
+
+# Global variable that holds the name of the S3 bucket that you're dumping to
+my_s3_bucket_name = &quot;NAME OF YOUR AMAZON S3 BUCKET&quot;
+
+# Create a service
+def get_ga_service():
+
+  print(&quot;\nConnecting to Google Analytics...\n&quot;)
+
+  f = open(ga_key_file_name, 'rb')
+  ga_key = f.read()
+  f.close()
+
+  ga_credentials = SignedJwtAssertionCredentials(ga_service_email, ga_key, scope=['https://www.googleapis.com/auth/analytics.readonly'])
+
+  ga_api_name = 'analytics'
+  ga_version = 'v3'
+
+  ga_service = build(ga_api_name,ga_version, http=ga_credentials.authorize(httplib2.Http()))
+
+  return ga_service
+
+# Get a profile id from the service
+# By default gets the id for the the first account, property, and view
+def get_ga_id(ga_service, acc_num = 0, prop_num = 0, view_num = 0):  
+
+  print(&quot;Using the following settings:\n&quot;)
+
+  try:
+    acc = ga_service.management().accounts().list().execute().get('items')[acc_num]
+    acc_id = acc.get('id')
+    print(&quot;Google Analytics account: &quot; + acc.get('name'))
+
+  except:
+    print(&quot;Error finding account&quot;)
+    return None
+
+  try:
+    prop = ga_service.management().webproperties().list(accountId=acc_id).execute().get('items')[prop_num]
+    prop_id = prop.get('id')
+    print(&quot;Property name: &quot; + prop.get('name'))
+  except:
+    print(&quot;Error finding property&quot;)
+    return None
+
+  try:
+    view = ga_service.management().profiles().list(accountId=acc_id,webPropertyId=prop_id).execute().get('items')[view_num]
+    view_id = view.get('id')
+    print(&quot;Analytics view name: &quot; + view.get('name') +&quot;\n&quot;)
+  except:
+    print(&quot;Error finding view&quot;)
+    return None
+
+  return view_id
+
+def pretty_json(obj):
+  return json.dumps(obj, sort_keys=True, separators=(',',':'), indent=4)
+
+# Dumps to three files:
+# One for geographic (geo) data, one for data about acquisition (acq), and another about devices used (ev)
+def fetch_and_dump(ga_service,ga_id):
+
+  # Google Analytics metrics we want
+  ga_metrics = 'ga:users,\
+                ga:newusers,\
+                ga:sessions,\
+                ga:bounces,\
+                ga:sessionDuration,\
+                ga:hits'
+
+  dims_date = ',ga:date,ga:hour'
+
+  # Sets of dimensions to look at
+  ga_dims_geo = 'ga:country,\
+                 ga:region,\
+                 ga:city,\
+                 ga:continent,\
+                 ga:language'+dims_date
+
+  ga_dims_acq = 'ga:source,\
+                 ga:medium,\
+                 ga:socialNetwork'+dims_date
+
+  ga_dims_dev = 'ga:browser,\
+                 ga:browserVersion,\
+                 ga:screenResolution,\
+                 ga:deviceCategory'+dims_date
+
+
+
+
+  data_geo = ga_service.data().ga().get(ids='ga:'+ga_id,start_date=sys.argv[1], end_date=sys.argv[1], metrics=ga_metrics, dimensions=ga_dims_geo).execute()
+  data_acq = ga_service.data().ga().get(ids='ga:'+ga_id,start_date=sys.argv[1], end_date=sys.argv[1], metrics=ga_metrics, dimensions=ga_dims_acq).execute()
+  data_dev = ga_service.data().ga().get(ids='ga:'+ga_id,start_date=sys.argv[1], end_date=sys.argv[1], metrics=ga_metrics, dimensions=ga_dims_dev).execute()
+
+  file_geo = 'google_analytics_geo_'+sys.argv[1]+'.json'
+  file_acq = 'google_analytics_acq_'+sys.argv[1]+'.json'
+  file_dev = 'google_analytics_dev_'+sys.argv[1]+'.json'
+
+  f_geo = open(file_geo,'w')
+  f_acq = open(file_acq,'w')
+  f_dev = open(file_dev,'w')
+
+  f_geo.write(pretty_json(data_geo))
+  f_acq.write(pretty_json(data_acq))
+  f_dev.write(pretty_json(data_dev))
+
+  f_geo.close()
+  f_acq.close()
+  f_dev.close()
+
+  # return a list of the dump files
+  file_list = [file_geo, file_acq, file_dev]
+
+  return file_list
+
+# Upload dumped files to Amazon cloud storage
+def upload_to_s3(file_list):
+  aws_s3 = boto3.resource('s3')
+
+  # Make a bucket if we need to
+  aws_s3.create_bucket(Bucket=my_s3_bucket_name)
+
+  for file_name in file_list:
+    aws_s3.Bucket(my_s3_bucket_name).put_object(Key=file_name, Body = open(file_name, 'rb'))
+
+# Main program execution
+my_service = get_ga_service()
+
+if my_service == None:
+  print(&quot;Error connecting to Google Analytics!&quot;)
+
+else:
+  my_id = get_ga_id(my_service)
+
+  print(&quot;Dumping Analytics data to files...&quot;)
+  files = fetch_and_dump(my_service,my_id)
+  print(&quot;Done!&quot;)
+
+  print(&quot;\nUploading to Amazon S3 storage...&quot;)
+  upload_to_s3(files)
+  print(&quot;Done!&quot;)
+</code></pre>
+
+<p>The script takes a single command line argument: an ISO 8601 formatted date that specifies which day to dump Google
+Analytics data from. For instance to retrieve the previous day&rsquo;s data, you could run:</p>
+
+<pre><code>$ python ga-dump.py `date -v -1d &quot;+%Y-%m-%d&quot;`
+</code></pre>
+
+<p>One possible use case would involve running this command at regular intervals via the unix cron daemon. As written, the
+script outputs three JSON files: one for visitor geographic data, one for visitor acquisition data, and one for data
+about the kinds of devices visitors are using.</p>
+
+<p>Before running, don&rsquo;t forget to change the global variables at the top of the listing to match your Google Analytics
+credentials and S3 bucketname! (Also: users of OS X will need to implement <a href="https://developers.google.com/gmail/api/quickstart/python#troubleshooting">this
+fix</a> before the script can run).</p>
+
+<h2 id="setting-up-apache-drill-for-use-with-s3">Setting up Apache Drill for use with S3</h2>
+
+<p>Now that we can toss dumps of Google Analytics up to the AWS cloud without much effort, it&rsquo;s time to implement Drill as
+an SQL interface to the data. Installing Drill itself is an extremely <a href="https://drill.apache.org/docs/installing-drill-on-linux-and-mac-os-x/">simple
+process</a> (all you need is Java and the Drill
+tarball), but we&rsquo;ll need to do a little configuration in order to talk to our S3 bucket.</p>
+
+<p>First, edit the file <code>core-site.xml</code> in the <code>./conf</code> directory of the Drill install, replacing the relevant parts with
+your Amazon S3 credentials:</p>
+
+<pre><code>&lt;configuration&gt;
+
+    &lt;property&gt;
+        &lt;name&gt;fs.s3a.access.key&lt;/name&gt;
+        &lt;value&gt;ENTER_YOUR_ACCESSKEY&lt;/value&gt;
+    &lt;/property&gt;
+
+    &lt;property&gt;
+        &lt;name&gt;fs.s3a.secret.key&lt;/name&gt;
+        &lt;value&gt;ENTER_YOUR_SECRETKEY&lt;/value&gt;
+    &lt;/property&gt;
+
+&lt;/configuration&gt;
+</code></pre>
+
+<p>Next, start up the embdedded (single machine) version of Drill</p>
+
+<pre><code>~/apache-drill/bin/drill-embedded
+</code></pre>
+
+<p>so we can use the Drill Web Console located at <a href="http://localhost:8047">http://localhost:8047</a>. We&rsquo;ll proceed by making a copy of the &lsquo;dfs&rsquo;
+storage plugin. To do this go to the &lsquo;Storage&rsquo; page, and hit &lsquo;Update&rsquo; next to &lsquo;dfs&rsquo;, making a copy of the text
+listed in the &ldquo;Configuration&rdquo; box that&rsquo;s displayed on the next page. Now type a name for our new S3 plugin into the &ldquo;New
+Storage Plugin&rdquo; box at the bottom of the previous page (&ldquo;s3-ga&rdquo; might make a good choice). Place the text for the &lsquo;dfs&rsquo;
+plugin into the box, editing <code>&quot;connection&quot;: &quot;file:///&quot;</code> so that it specifies S3 and the name of your bucket instead, as
+in <code>&quot;connection&quot;: &quot;s3a://example.bucketname&quot;</code>. Hit &ldquo;Create&rdquo; to make the plugin.</p>
+
+<h2 id="querying-google-analytics-json-with-apache-drill">Querying Google Analytics JSON with Apache Drill</h2>
+
+<p>Now we&rsquo;re ready to start querying our Google Analytics JSON using Drill! Try a simple <code>SELECT *</code> from the <code>drill-embedded</code> prompt:</p>
+
+<pre><code>&gt; SELECT * FROM `s3-ga`.`google_analytics_geo_2015-10-19.json`;
+</code></pre>
+
+<p>You may notice that the results of this query are not exactly&hellip; beautiful. This is because the structure of a Google
+Analytics JSON dump isn&rsquo;t compatible with simple queries like this. And that&rsquo;s okay! We can easily work around that with
+some slightly more sophisticated SQL (Hey, if you wanted easy you&rsquo;d be using the web interface, right?).</p>
+
+<p>To list information about the columns of our data set, we can use the following command:</p>
+
+<pre><code>&gt; SELECT ROW_NUMBER() OVER(ORDER BY 1) - 1 AS `Column Index`, KVGEN(FLATTEN(ga_table.columnHeaders))[2] AS `Column Info`
+&gt; FROM `s3-ga`.`google_analytics_geo_2015-10-19.json` ga_table;
++---------------+----------------------------------------------+
+| Column Index  |                 Column Info                  |
++---------------+----------------------------------------------+
+| 0             | {&quot;key&quot;:&quot;name&quot;,&quot;value&quot;:&quot;ga:country&quot;}          |
+| 1             | {&quot;key&quot;:&quot;name&quot;,&quot;value&quot;:&quot;ga:region&quot;}           |
+| 2             | {&quot;key&quot;:&quot;name&quot;,&quot;value&quot;:&quot;ga:city&quot;}             |
+| 3             | {&quot;key&quot;:&quot;name&quot;,&quot;value&quot;:&quot;ga:continent&quot;}        |
+| 4             | {&quot;key&quot;:&quot;name&quot;,&quot;value&quot;:&quot;ga:language&quot;}         |
+| 5             | {&quot;key&quot;:&quot;name&quot;,&quot;value&quot;:&quot;ga:date&quot;}             |
+| 6             | {&quot;key&quot;:&quot;name&quot;,&quot;value&quot;:&quot;ga:hour&quot;}             |
+| 7             | {&quot;key&quot;:&quot;name&quot;,&quot;value&quot;:&quot;ga:users&quot;}            |
+| 8             | {&quot;key&quot;:&quot;name&quot;,&quot;value&quot;:&quot;ga:newusers&quot;}         |
+| 9             | {&quot;key&quot;:&quot;name&quot;,&quot;value&quot;:&quot;ga:sessions&quot;}         |
+| 10            | {&quot;key&quot;:&quot;name&quot;,&quot;value&quot;:&quot;ga:bounces&quot;}          |
+| 11            | {&quot;key&quot;:&quot;name&quot;,&quot;value&quot;:&quot;ga:sessionDuration&quot;}  |
+| 12            | {&quot;key&quot;:&quot;name&quot;,&quot;value&quot;:&quot;ga:hits&quot;}             |
++---------------+----------------------------------------------+
+13 rows selected (1.739 seconds)
+</code></pre>
+
+<p>And now that we know the column index for &lsquo;ga:city&rsquo; is &lsquo;2&rsquo; we can use this query to inspect what cities visitors came
+from on the date of the file:</p>
+
+<pre><code>&gt; SELECT DISTINCT FLATTEN(ga_table.`rows`)[2] AS Cities FROM `s3-ga`.`google_analytics_geo_2015-10-19.json` ga_table;
++-------------+
+|   Cities    |
++-------------+
+| (not set)   |
+| Almaty      |
+| Pushkino    |
+| Samara      |
+| Seoul       |
+| Tolyatti    |
+| Tula        |
+| Volgodonsk  |
++-------------+
+8 rows selected (1.292 seconds)
+</code></pre>
+
+<p>This simple example is fine, but as I pointed out before the advantage of this approach is the flexibility you gain in
+making queries. So let&rsquo;s set our sights on doing something that&rsquo;s impossible to accomplish even in the &lsquo;Custom Reports&rsquo;
+interface of the Google Analytics web GUI: inspecting more than 5 analysis dimensions simultaneously.</p>
+
+<p>The following statement asks for the total number of sessions along the dimensions of date, hour, browser name, browser
+version, screen resolution, and type of device. Formulating a statement that analyzes several columns of data is
+somewhat more complicated than our previous single-column example, and I ended up constructing mine out of two
+subqueries:</p>
+
+<pre><code class="language-sql">  SELECT `Date`, `Hour`, Browser, Version, Resolution, Device, SUM(CAST(Sessions AS INTEGER)) `Total Sessions`
+    FROM (SELECT data[4] `Date`, data[5] `Hour`, data[0] Browser, data[1] Version, data[2] Resolution, data[3] Device, data[8] Sessions
+            FROM (SELECT FLATTEN(ga_table.`rows`) data
+                    FROM `s3-ga`.`google_analytics_dev_2015-10-19.json` ga_table))
+GROUP BY `Date`, `Hour`, Browser, Version, Resolution, Device
+ORDER BY `Date`, `Hour`;
+</code></pre>
+
+<p>Here the innermost query FLATTENs the data while the next one picks out columns and assigns them names. The main
+query handles tallying the total sessions and organizing the data.</p>
+
+<p>Unfortunately my personal site doesn&rsquo;t get enough traffic to take advantage of the GROUP BY, but the results look like
+this:</p>
+
+<pre><code>+-----------+-------+------------+-----------------+-------------+----------+-----------------+
+|   Date    | Hour  |  Browser   |     Version     | Resolution  |  Device  | Total Sessions  |
++-----------+-------+------------+-----------------+-------------+----------+-----------------+
+| 20151019  | 03    | Safari     | 8.0             | 1366x768    | mobile   | 1               |
+| 20151019  | 04    | YaBrowser  | 44.0.2403.3043  | 1024x768    | desktop  | 1               |
+| 20151019  | 04    | Chrome     | 40.0.2214.111   | (not set)   | desktop  | 2               |
+| 20151019  | 05    | YaBrowser  | 44.0.2403.3043  | 1024x768    | desktop  | 1               |
+| 20151019  | 07    | Safari     | 8.0             | 1366x768    | mobile   | 1               |
+| 20151019  | 10    | Chrome     | 39.0.2171.71    | 1024x768    | desktop  | 1               |
+| 20151019  | 10    | Safari     | 8.0             | 1366x768    | mobile   | 1               |
+| 20151019  | 11    | Safari     | 8.0             | 1366x768    | mobile   | 1               |
+| 20151019  | 12    | Safari     | 8.0             | 1366x768    | mobile   | 0               |
+| 20151019  | 12    | Chrome     | 46.0.2490.71    | 1024x768    | desktop  | 1               |
+| 20151019  | 13    | Safari     | 8.0             | 1366x768    | mobile   | 1               |
+| 20151019  | 14    | Safari     | 8.0             | 1366x768    | mobile   | 1               |
+| 20151019  | 15    | Safari     | 8.0             | 1366x768    | mobile   | 1               |
+| 20151019  | 16    | Safari     | 8.0             | 1366x768    | mobile   | 1               |
+| 20151019  | 18    | Safari     | 8.0             | 1366x768    | mobile   | 1               |
+| 20151019  | 19    | Safari     | 8.0             | 1366x768    | mobile   | 1               |
+| 20151019  | 21    | Safari     | 8.0             | 1366x768    | mobile   | 2               |
+| 20151019  | 21    | Chrome     | 39.0.2171.71    | 1024x768    | desktop  | 1               |
++-----------+-------+------------+-----------------+-------------+----------+-----------------+
+18 rows selected (2.086 seconds)
+</code></pre>
+
+<p>While it&rsquo;s definitely possible to interface with the data this way, Apache Drill offers an alternative solution in the
+form of custom user defined functions. In my <a href="/blog/querying-google-analytics-json-with-a-custom-sql-function/">next
+post</a>, I&rsquo;ll show you how to implement a
+GAHELPER() function that makes working with Google Analytics data from the Drill command line significantly easier.</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

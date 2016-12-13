@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/type/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/type/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Querying dates using SQL in a JSON document</title>
+      <link>/kstirman.github.io/bookshelf/blog/querying-dates-using-SQL-in-a-JSON-document/</link>
+      <pubDate>Thu, 03 Dec 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/querying-dates-using-SQL-in-a-JSON-document/</guid>
+      <description>&lt;p&gt;In this article we&amp;rsquo;re going to use Apache Drill to bend TIME ITSELF to our every whim. Or wait, not TIME ITSELF. I
+meant, er&amp;hellip; TIMESTAMPS. Don&amp;rsquo;t worry&amp;mdash;that&amp;rsquo;s still pretty useful.&lt;/p&gt;
+
+&lt;p&gt;So let&amp;rsquo;s say I have the results of a Twitter search in raw JSON and would like to know the range of dates that the
+statuses span. For this we&amp;rsquo;ll need the timestamp information, which is held in the &amp;lsquo;created_at&amp;rsquo; key of each object.&lt;/p&gt;
+
+&lt;p&gt;Now take a look at my search results for the word &amp;lsquo;squark.&amp;rsquo; (Yes, that&amp;rsquo;s a real word. You can Google it and learn
+some particle physics.) We&amp;rsquo;ll first try to find the dates spanned by the results using this method:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT MIN(t.created_at) FROM dfs.`/path/to/search.json` t;
++---------------------------------+
+|             EXPR$0              |
++---------------------------------+
+| Fri Nov 27 02:34:52 +0000 2015  |
++---------------------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT MAX(t.created_at) FROM dfs.`/path/to/search.json` t;
++---------------------------------+
+|             EXPR$0              |
++---------------------------------+
+| Wed Nov 25 19:42:49 +0000 2015  |
++---------------------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Well, the minimum date is later than the maximum date, so it&amp;rsquo;s safe to say that didn&amp;rsquo;t work. Here&amp;rsquo;s the reason:
+&amp;lsquo;created_at&amp;rsquo; is being treated as a string typed variable and not as a timestamp. Fixing this is fairly straightforward,
+we&amp;rsquo;ll just have to use the &lt;code&gt;TO_TIMESTAMP()&lt;/code&gt; function to convert the type.&lt;/p&gt;
+
+&lt;p&gt;&lt;code&gt;TO_TIMESTAMP()&lt;/code&gt; takes two arguments: the first one is the name of the column you&amp;rsquo;d like to convert, and the second one
+is a string that describes the format of the date that you&amp;rsquo;re converting (use this
+&lt;a href=&#34;http://joda-time.sourceforge.net/apidocs/org/joda/time/format/DateTimeFormat.html&#34;&gt;page&lt;/a&gt; as a reference).&lt;/p&gt;
+
+&lt;p&gt;So in my case I can convert my date strings to the timestamp type with these arguments:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;TO_TIMESTAMP(t.created_at, &#39;EEE MMM dd HH:mm:ss +0000 yyyy&#39;)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And now let&amp;rsquo;s try to find the first and last date again:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT MIN(TO_TIMESTAMP(t.created_at, &#39;EEE MMM dd HH:mm:ss +0000 yyyy&#39;)) FROM
+&amp;gt; dfs.`/path/to/search.json` t;
++------------------------+
+|         EXPR$0         |
++------------------------+
+| 2015-11-25 19:42:49.0  |
++------------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT MAX(TO_TIMESTAMP(t.created_at, &#39;EEE MMM dd HH:mm:ss +0000 yyyy&#39;)) FROM
+&amp;gt; dfs.`/path/to/search.json` t;
++------------------------+
+|         EXPR$0         |
++------------------------+
+| 2015-12-02 14:42:30.0  |
++------------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Much better!&lt;/p&gt;
+
+&lt;p&gt;Rigorously manipulating time data is the sort of fiddly work that can give even experienced technical types an anxious
+rash, so it&amp;rsquo;s nice to know that Drill has your back when it comes to making date format conversions.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

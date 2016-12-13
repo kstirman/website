@@ -1,0 +1,897 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/json/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/json/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Querying dates using SQL in a JSON document</title>
+      <link>/kstirman.github.io/bookshelf/blog/querying-dates-using-SQL-in-a-JSON-document/</link>
+      <pubDate>Thu, 03 Dec 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/querying-dates-using-SQL-in-a-JSON-document/</guid>
+      <description>&lt;p&gt;In this article we&amp;rsquo;re going to use Apache Drill to bend TIME ITSELF to our every whim. Or wait, not TIME ITSELF. I
+meant, er&amp;hellip; TIMESTAMPS. Don&amp;rsquo;t worry&amp;mdash;that&amp;rsquo;s still pretty useful.&lt;/p&gt;
+
+&lt;p&gt;So let&amp;rsquo;s say I have the results of a Twitter search in raw JSON and would like to know the range of dates that the
+statuses span. For this we&amp;rsquo;ll need the timestamp information, which is held in the &amp;lsquo;created_at&amp;rsquo; key of each object.&lt;/p&gt;
+
+&lt;p&gt;Now take a look at my search results for the word &amp;lsquo;squark.&amp;rsquo; (Yes, that&amp;rsquo;s a real word. You can Google it and learn
+some particle physics.) We&amp;rsquo;ll first try to find the dates spanned by the results using this method:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT MIN(t.created_at) FROM dfs.`/path/to/search.json` t;
++---------------------------------+
+|             EXPR$0              |
++---------------------------------+
+| Fri Nov 27 02:34:52 +0000 2015  |
++---------------------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT MAX(t.created_at) FROM dfs.`/path/to/search.json` t;
++---------------------------------+
+|             EXPR$0              |
++---------------------------------+
+| Wed Nov 25 19:42:49 +0000 2015  |
++---------------------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Well, the minimum date is later than the maximum date, so it&amp;rsquo;s safe to say that didn&amp;rsquo;t work. Here&amp;rsquo;s the reason:
+&amp;lsquo;created_at&amp;rsquo; is being treated as a string typed variable and not as a timestamp. Fixing this is fairly straightforward,
+we&amp;rsquo;ll just have to use the &lt;code&gt;TO_TIMESTAMP()&lt;/code&gt; function to convert the type.&lt;/p&gt;
+
+&lt;p&gt;&lt;code&gt;TO_TIMESTAMP()&lt;/code&gt; takes two arguments: the first one is the name of the column you&amp;rsquo;d like to convert, and the second one
+is a string that describes the format of the date that you&amp;rsquo;re converting (use this
+&lt;a href=&#34;http://joda-time.sourceforge.net/apidocs/org/joda/time/format/DateTimeFormat.html&#34;&gt;page&lt;/a&gt; as a reference).&lt;/p&gt;
+
+&lt;p&gt;So in my case I can convert my date strings to the timestamp type with these arguments:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;TO_TIMESTAMP(t.created_at, &#39;EEE MMM dd HH:mm:ss +0000 yyyy&#39;)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And now let&amp;rsquo;s try to find the first and last date again:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT MIN(TO_TIMESTAMP(t.created_at, &#39;EEE MMM dd HH:mm:ss +0000 yyyy&#39;)) FROM
+&amp;gt; dfs.`/path/to/search.json` t;
++------------------------+
+|         EXPR$0         |
++------------------------+
+| 2015-11-25 19:42:49.0  |
++------------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT MAX(TO_TIMESTAMP(t.created_at, &#39;EEE MMM dd HH:mm:ss +0000 yyyy&#39;)) FROM
+&amp;gt; dfs.`/path/to/search.json` t;
++------------------------+
+|         EXPR$0         |
++------------------------+
+| 2015-12-02 14:42:30.0  |
++------------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Much better!&lt;/p&gt;
+
+&lt;p&gt;Rigorously manipulating time data is the sort of fiddly work that can give even experienced technical types an anxious
+rash, so it&amp;rsquo;s nice to know that Drill has your back when it comes to making date format conversions.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>White mana cards are cheap and stupid: Querying a database of every Magic card ever made</title>
+      <link>/kstirman.github.io/bookshelf/blog/white-mana-cards-are-cheap-and-stupid-querying-a-database-of-every-magic-card-ever-made/</link>
+      <pubDate>Thu, 03 Dec 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/white-mana-cards-are-cheap-and-stupid-querying-a-database-of-every-magic-card-ever-made/</guid>
+      <description>&lt;p&gt;With over 10,000 unique cards and a decade of success behind it, &lt;em&gt;Magic: The Gathering&lt;/em&gt; is still as relevant as ever to
+fans of the collectible card game genre. But how well has &lt;em&gt;Magic&lt;/em&gt; managed to stick to its core design philosophy over
+the years? Today we&amp;rsquo;ll examine this question by analyzing a JSON dump of the text found on every card ever produced.&lt;/p&gt;
+
+&lt;p&gt;For the uninitiated (and those who haven&amp;rsquo;t a touched a card since their days on the middle school cafeteria circuit),
+actions in a &lt;em&gt;Magic&lt;/em&gt; game are enabled by a resource called &amp;ldquo;mana&amp;rdquo; that comes in five fundamental varieties: White, Blue,
+Black, Red, and Green. Each of these colors has a different personality and play style. I&amp;rsquo;m not going to go into extreme
+detail here (believe me, you can find that somewhere else on the web if you need it), but some of the characteristics
+are:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;White: Likes to fight using small creatures. Has a focus on life and healing.&lt;/li&gt;
+&lt;li&gt;Blue: Values control and intellectual capacity.&lt;/li&gt;
+&lt;li&gt;Black: Uses cards with themes of death and disease. Not afraid of hurting the player to the gain the advantage.&lt;/li&gt;
+&lt;li&gt;Red: Emphasis on creatures that pack a lot of offensive punch and spells that do damage.&lt;/li&gt;
+&lt;li&gt;Green: Employs large powerful creatures and nature/life forces.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;&lt;br&gt;
+&lt;br&gt;
+&lt;p style=&#34;text-align: center;&#34;&gt;
+&lt;img style=&#34;max-width: 100%;&#34; src=&#34;kstirman.github.io/bookshelf/img/mtg_mana.jpg&#34;&gt;
+&lt;/p&gt;
+&lt;p style=&#34;text-align: center; font-style: italic;&#34;&gt;The mana symbols of &lt;em&gt;Magic: The Gathering&lt;/em&gt;.&lt;br&gt;Source: &lt;a href=&#34;http://archive.wizards.com/Magic/magazine/article.aspx?x=mtg/daily/arcana/719&#34;&gt;http://archive.wizards.com/Magic/magazine/article.aspx?x=mtg/daily/arcana/719&lt;/a&gt;&lt;/p&gt;
+&lt;br&gt;
+&lt;br&gt;&lt;/p&gt;
+
+&lt;p&gt;We&amp;rsquo;ll proceed by using Apache Drill to query a folder full of JSON documents (one for each &lt;em&gt;Magic&lt;/em&gt; set), which is
+available via &lt;a href=&#34;http://mtgjson.com&#34;&gt;this site&lt;/a&gt; as a zipped file. As an example, here&amp;rsquo;s the JSON for a card called
+&amp;ldquo;Abyssal Hunter&amp;rdquo; which is found in the &amp;ldquo;cards&amp;rdquo; list of the object/file corresponding to the &amp;ldquo;Mirage&amp;rdquo; set:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;{
+  &amp;quot;artist&amp;quot;:&amp;quot;Steve Luke&amp;quot;,
+  &amp;quot;cmc&amp;quot;:4,
+  &amp;quot;colors&amp;quot;:[&amp;quot;Black&amp;quot;],
+  &amp;quot;flavor&amp;quot;:&amp;quot;Some smiles show cheer; some merely show teeth.&amp;quot;,
+  &amp;quot;id&amp;quot;:&amp;quot;61beaf3de61dc097e0070b3f13b8de84da3c2761&amp;quot;,
+  &amp;quot;imageName&amp;quot;:&amp;quot;abyssal hunter&amp;quot;,
+  &amp;quot;layout&amp;quot;:&amp;quot;normal&amp;quot;,
+  &amp;quot;manaCost&amp;quot;:&amp;quot;{3}{B}&amp;quot;,
+  &amp;quot;multiverseid&amp;quot;:3272,&amp;quot;name&amp;quot;:&amp;quot;Abyssal Hunter&amp;quot;,
+  &amp;quot;power&amp;quot;:&amp;quot;1&amp;quot;,
+  &amp;quot;rarity&amp;quot;:&amp;quot;Rare&amp;quot;,
+  &amp;quot;subtypes&amp;quot;:[&amp;quot;Human&amp;quot;,&amp;quot;Assassin&amp;quot;],
+  &amp;quot;text&amp;quot;:&amp;quot;{B}, {T}: Tap target creature. Abyssal Hunter deals damage equal to Abyssal Hunter&#39;s power to that creature.&amp;quot;,
+  &amp;quot;toughness&amp;quot;:&amp;quot;1&amp;quot;,
+  &amp;quot;type&amp;quot;:&amp;quot;Creature — Human Assassin&amp;quot;,
+  &amp;quot;types&amp;quot;:[&amp;quot;Creature&amp;quot;]
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Before we begin our analysis, let&amp;rsquo;s do a little prep work and set up a &amp;ldquo;view&amp;rdquo; in Drill called &lt;code&gt;card_data&lt;/code&gt; that we can
+query against. The following command makes a view that pulls data about the name, mana cost, text, mana color, and the
+toughness/power of a card if it&amp;rsquo;s a &amp;lsquo;creature&amp;rsquo;:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-sql&#34;&gt;CREATE VIEW card_data AS select DISTINCT t.cards.name Name, t.cards.cmc CMC, t.cards.text Text, t.cards.colors[0] Color,
+            t.cards.types[0] Type, t.cards.toughness Toughness, t.cards.`power` `Power`
+       FROM (SELECT FLATTEN(t_raw.cards) cards
+               FROM dfs.`/path/to/AllSetFiles` t_raw) t
+       WHERE t.cards.colors[0] IS NOT NULL
+         AND t.cards.colors[1] IS NULL
+         AND t.cards.types[0] IS NOT NULL
+         AND t.cards.types[1] IS NULL;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;To simplify things, I&amp;rsquo;m using the last four lines to specify cards that have only one color requirement for mana (e.g.
+&amp;lsquo;Black&amp;rsquo;), and are classified as belonging to only one type (e.g. &amp;lsquo;Creature&amp;rsquo;).&lt;/p&gt;
+
+&lt;p&gt;First, let&amp;rsquo;s see if Black&amp;rsquo;s supposed fascination with morbidity holds up by searching the card texts for instances of
+the word &amp;lsquo;die.&amp;rsquo;&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT Color, COUNT(Name) `Num Cards` FROM card_data WHERE LOWER(Text) LIKE &#39;%die%&#39; GROUP BY Color;
++--------+------------+
+| Color  | Num Cards  |
++--------+------------+
+| White  | 45         |
+| Black  | 74         |
+| Red    | 48         |
+| Green  | 49         |
+| Blue   | 13         |
++--------+------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Ok, so far so good. Now what about the word &amp;lsquo;life&amp;rsquo;? Seems like this one should show up a lot in White and maybe Green
+cards.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT Color, COUNT(Name) `Num Cards` FROM card_data WHERE LOWER(Text) LIKE &#39;%life%&#39; GROUP BY Color;
++--------+------------+
+| Color  | Num Cards  |
++--------+------------+
+| White  | 189        |
+| Black  | 243        |
+| Green  | 80         |
+| Blue   | 9          |
+| Red    | 20         |
++--------+------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Wow&amp;mdash;Black is once again in the lead! I think that makes sense though; a lot of Black cards probably
+have to do with manipulating the player&amp;rsquo;s life points. But it&amp;rsquo;s still a bit odd that Black comes off as the most
+explicitly &amp;lsquo;life&amp;rsquo;-obsessed.&lt;/p&gt;
+
+&lt;p&gt;Next let&amp;rsquo;s see if the creature cards from each color of mana fall in line with their characterizations from the list
+above. We can ask for the average &amp;lsquo;power&amp;rsquo; and &amp;lsquo;toughness&amp;rsquo; of creatures with non-contextual stats (i.e., ones that don&amp;rsquo;t
+have an asterisk in these values) with this query:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT Color, AVG(CAST(`Power` AS FLOAT)) `Avg Power`, AVG(CAST(Toughness AS FLOAT)) `Avg Toughness` FROM card_data t WHERE Type = &#39;Creature&#39; AND `Power` NOT LIKE &#39;%*%&#39; AND `Toughness` NOT LIKE &#39;%*%&#39; GROUP BY Color;
++--------+---------------------+---------------------+
+| Color  |      Avg Power      |    Avg Toughness    |
++--------+---------------------+---------------------+
+| White  | 2.026235741444867   | 2.555513307984791   |
+| Blue   | 2.2026678141135974  | 2.6351118760757317  |
+| Black  | 2.5331278890600926  | 2.450308166409861   |
+| Red    | 2.6187548039969255  | 2.4584934665641813  |
+| Green  | 2.6882978723404256  | 2.8177304964539007  |
++--------+---------------------+---------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Yup, Green definitely has the most &amp;lsquo;power&amp;rsquo;-ful offensive creatures on average, with Red falling just behind it. But
+what&amp;rsquo;s interesting about the results of this query is how close the average Black creature falls to the average Red
+creature&amp;mdash;especially when you take into account their defensive &amp;lsquo;toughness&amp;rsquo; stat. Black&amp;rsquo;s creature characterization
+isn&amp;rsquo;t emphasized in descriptions of the mana colors, but this table indicates that Black creatures are &amp;ldquo;basically Red&amp;rdquo;
+(at least when it comes to their fundamental stats).&lt;/p&gt;
+
+&lt;p&gt;Finally, let&amp;rsquo;s check out the average converted mana cost and average text length of mono-colored, mono-typed cards.
+Converted mana cost (CMC) is the total amount of mana resources (color-specific plus any-colored) that a card requires
+when it&amp;rsquo;s put in play, and the text of a card tells you how to use it in a game.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT Color, AVG(CMC) `Avg CMC`, AVG(LENGTH(Text)) `Avg Text Length` FROM card_data t GROUP BY Color;
++--------+---------------------+---------------------+
+| Color  |       Avg CMC       |   Avg Text Length   |
++--------+---------------------+---------------------+
+| White  | 3.154371002132196   | 132.53899480069325  |
+| Blue   | 3.3505647263249347  | 143.49057430951336  |
+| Black  | 3.4389721627408996  | 141.2681660899654   |
+| Red    | 3.3674957118353346  | 138.5313862249346   |
+| Green  | 3.3970149253731345  | 139.6011309264898   |
++--------+---------------------+---------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Remember how I said White liked to play small creatures? Well it looks like all those small-cost cards are pretty
+evident in White&amp;rsquo;s average mana cost. So: check. White is behaving as expected.&lt;/p&gt;
+
+&lt;p&gt;It&amp;rsquo;s worth noting, though, that Black clearly has the highest average mana cost of the five colors. I feel like that&amp;rsquo;s
+pretty notable! Maybe that fact should be included in more intro summaries.&lt;/p&gt;
+
+&lt;p&gt;We haven&amp;rsquo;t talked about Blue much yet, but remember: It&amp;rsquo;s the mana color that most likes to show off its knack for
+strategy and fancy book learnin&amp;rsquo;. If we can take the average length of a card&amp;rsquo;s instruction text to be a good indicator
+of complexity, then this table shows that Blue definitely lives up to its reputation.&lt;/p&gt;
+
+&lt;p&gt;So if Blue is &amp;lsquo;smart,&amp;rsquo; then who is &amp;lsquo;stupid&amp;rsquo;? Well, I guess that would be White. However, I can see why no one describes
+it that way: &amp;ldquo;Play White: It&amp;rsquo;s cheap and stupid!&amp;rdquo; probably isn&amp;rsquo;t the best way create new fans of White &lt;em&gt;Magic&lt;/em&gt; cards.&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;Mana symbols and card text are copyright Wizards of the Coast LLC.&lt;/em&gt;&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Bless this mess: Working with complicated JSON structure in SQL</title>
+      <link>/kstirman.github.io/bookshelf/blog/bless-this-mess-workng-with-complicated-JSON-structure-in-SQL/</link>
+      <pubDate>Tue, 01 Dec 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/bless-this-mess-workng-with-complicated-JSON-structure-in-SQL/</guid>
+      <description>&lt;p&gt;Data you find on the web comes in all formats. From simple CSV to some really creepy-crawly JSON. The data provided by
+the Twitter API to describe a tweet unfortunately falls within the latter category.&lt;/p&gt;
+
+&lt;p&gt;In this article I&amp;rsquo;ll use Drill to provide an SQL interface to a MongoDB collection of about 52,000 tweets pulled from
+the Twitter streaming API. As I alluded to, tweet data presents itself in a way that manifests a lot of nested elements,
+and documents in the collection follow this JSON structure:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;{
+  &amp;quot;contributors&amp;quot;: null,
+  &amp;quot;coordinates&amp;quot;: null,
+  &amp;quot;created_at&amp;quot;: &amp;quot;Mon Nov 09 23:18:16 +0000 2015&amp;quot;,
+  &amp;quot;entities&amp;quot;: {
+    &amp;quot;hashtags&amp;quot;: [],
+    &amp;quot;media&amp;quot;: [
+      {
+        &amp;quot;display_url&amp;quot;: &amp;quot;pic.twitter.com/NNAPr46qDz&amp;quot;,
+        &amp;quot;expanded_url&amp;quot;: &amp;quot;http://twitter.com/NewsFlashback/status/663858171639939072/photo/1&amp;quot;,
+        &amp;quot;id&amp;quot;: 663858170704490496,
+        &amp;quot;id_str&amp;quot;: &amp;quot;663858170704490496&amp;quot;,
+        &amp;quot;indices&amp;quot;: [
+          121,
+          144
+        ],
+        &amp;quot;media_url&amp;quot;: &amp;quot;http://pbs.twimg.com/media/CTZ_fS4U8AAkti7.jpg&amp;quot;,
+        &amp;quot;media_url_https&amp;quot;: &amp;quot;https://pbs.twimg.com/media/CTZ_fS4U8AAkti7.jpg&amp;quot;,
+        &amp;quot;sizes&amp;quot;: {
+          &amp;quot;large&amp;quot;: {
+            &amp;quot;h&amp;quot;: 450,
+            &amp;quot;resize&amp;quot;: &amp;quot;fit&amp;quot;,
+            &amp;quot;w&amp;quot;: 450
+          },
+          &amp;quot;medium&amp;quot;: {
+            &amp;quot;h&amp;quot;: 450,
+            &amp;quot;resize&amp;quot;: &amp;quot;fit&amp;quot;,
+            &amp;quot;w&amp;quot;: 450
+          },
+          &amp;quot;small&amp;quot;: {
+            &amp;quot;h&amp;quot;: 340,
+            &amp;quot;resize&amp;quot;: &amp;quot;fit&amp;quot;,
+            &amp;quot;w&amp;quot;: 340
+          },
+          &amp;quot;thumb&amp;quot;: {
+            &amp;quot;h&amp;quot;: 150,
+            &amp;quot;resize&amp;quot;: &amp;quot;crop&amp;quot;,
+            &amp;quot;w&amp;quot;: 150
+          }
+        },
+        &amp;quot;type&amp;quot;: &amp;quot;photo&amp;quot;,
+        &amp;quot;url&amp;quot;: &amp;quot;https://t.co/NNAPr46qDz&amp;quot;
+      }
+    ],
+    ... etc
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;(see &lt;a href=&#34;https://gist.github.com/nategri/c34e1868792b23e97f2f&#34;&gt;this link&lt;/a&gt; for the whole entry). That looks pretty intense,
+right? But don&amp;rsquo;t worry&amp;mdash;Drill is up to the task! We&amp;rsquo;ll be talking to that mess with ANSI SQL in no time.&lt;/p&gt;
+
+&lt;p&gt;Assuming you&amp;rsquo;ve already connected Drill to your MongoDB (just click &amp;lsquo;Enable&amp;rsquo; next to the MongoDB plugin at
+&lt;a href=&#34;http://localhost:8047/storage&#34;&gt;http://localhost:8047/storage&lt;/a&gt; after running &lt;code&gt;drill-embedded&lt;/code&gt;), we&amp;rsquo;re ready to begin querying the Twitter data using SQL.&lt;/p&gt;
+
+&lt;p&gt;For my analysis goal, I’m going focus on coming up with a method to examine the number of hashtags that occur in tweets
+from verified users in my data set. To begin, let’s look at the array of hashtags that the tweet JSON lists for verified
+users with at least one hashtag:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-sql&#34;&gt;SELECT tw.id `Tweet Id`, tw.`user`.screen_name `Screen Name`, tw.entities.hashtags `Hashtag Array`
+  FROM dfs.`/path/to/tweets.small.json` tw
+ WHERE tw.entities.hashtags[0].text IS NOT NULL
+   AND tw.`user`.verified = true
+ LIMIT 15;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;With results:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;+---------------------+----------------+-----------------------------------------------------------------------------------+
+|      Tweet Id       |  Screen Name   |                                   Hashtag Array                                   |
++---------------------+----------------+-----------------------------------------------------------------------------------+
+| 663858238757199873  | FinishLine     | [{&amp;quot;indices&amp;quot;:[116,132],&amp;quot;text&amp;quot;:&amp;quot;TheFundamentals&amp;quot;}]                                  |
+| 663858343581237248  | antena3com     | [{&amp;quot;indices&amp;quot;:[82,97],&amp;quot;text&amp;quot;:&amp;quot;MarDePlástico8&amp;quot;}]                                     |
+| 663858351978078208  | tacobell       | [{&amp;quot;indices&amp;quot;:[12,28],&amp;quot;text&amp;quot;:&amp;quot;TacoEmojiEngine&amp;quot;}]                                    |
+| 663858351990697984  | tacobell       | [{&amp;quot;indices&amp;quot;:[14,30],&amp;quot;text&amp;quot;:&amp;quot;TacoEmojiEngine&amp;quot;}]                                    |
+| 663858553329815553  | CollegeHumor   | [{&amp;quot;indices&amp;quot;:[0,14],&amp;quot;text&amp;quot;:&amp;quot;TheCrunchBowl&amp;quot;}]                                       |
+| 663858746251042816  | tacobell       | [{&amp;quot;indices&amp;quot;:[12,28],&amp;quot;text&amp;quot;:&amp;quot;TacoEmojiEngine&amp;quot;}]                                    |
+| 663859039831486465  | VctorClavijo   | [{&amp;quot;indices&amp;quot;:[14,23],&amp;quot;text&amp;quot;:&amp;quot;Carlos10&amp;quot;}]                                           |
+| 663859115358158848  | FarnamHorse    | [{&amp;quot;indices&amp;quot;:[0,11],&amp;quot;text&amp;quot;:&amp;quot;DidYouKnow&amp;quot;}]                                          |
+| 663859161503928320  | vpelham        | [{&amp;quot;indices&amp;quot;:[20,29],&amp;quot;text&amp;quot;:&amp;quot;feminist&amp;quot;},{&amp;quot;indices&amp;quot;:[127,136],&amp;quot;text&amp;quot;:&amp;quot;feminism&amp;quot;}]   |
+| 663859312469651456  | AlPrimerToque  | [{&amp;quot;indices&amp;quot;:[0,18],&amp;quot;text&amp;quot;:&amp;quot;LorenzoEnOndaCero&amp;quot;}]                                   |
+| 663859425715834880  | NewsTalk770    | [{&amp;quot;indices&amp;quot;:[82,91],&amp;quot;text&amp;quot;:&amp;quot;yycroads&amp;quot;},{&amp;quot;indices&amp;quot;:[92,103],&amp;quot;text&amp;quot;:&amp;quot;yyctraffic&amp;quot;}]  |
+| 663859471844810752  | BrentASJax     | [{&amp;quot;indices&amp;quot;:[70,83],&amp;quot;text&amp;quot;:&amp;quot;FirstAlertWX&amp;quot;}]                                       |
+| 663859530598514688  | simpsonwhnt    | [{&amp;quot;indices&amp;quot;:[102,111],&amp;quot;text&amp;quot;:&amp;quot;valleywx&amp;quot;}]                                         |
+| 663859702535553024  | PrimerImpacto  | [{&amp;quot;indices&amp;quot;:[75,89],&amp;quot;text&amp;quot;:&amp;quot;PrimerImpacto&amp;quot;}]                                      |
+| 663859799004581888  | DPostSports    | [{&amp;quot;indices&amp;quot;:[41,49],&amp;quot;text&amp;quot;:&amp;quot;Rockies&amp;quot;}]                                            |
++---------------------+----------------+-----------------------------------------------------------------------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now I’ll use the &lt;code&gt;FLATTEN()&lt;/code&gt; function on the array to make one row for each hashtag in a tweet:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-sql&#34;&gt;SELECT tw.id `Tweet Id`, tw.`user`.screen_name `Screen Name`, FLATTEN(tw.entities.hashtags) `Hashtags`
+  FROM dfs.`/path/to/tweets.small.json` tw
+ WHERE tw.entities.hashtags[0].text IS NOT NULL
+   AND tw.`user`.verified = true
+ LIMIT 15;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;pre&gt;&lt;code&gt;+---------------------+----------------+-------------------------------------------------+
+|      Tweet Id       |  Screen Name   |                    Hashtags                     |
++---------------------+----------------+-------------------------------------------------+
+| 663858238757199873  | FinishLine     | {&amp;quot;indices&amp;quot;:[116,132],&amp;quot;text&amp;quot;:&amp;quot;TheFundamentals&amp;quot;}  |
+| 663858343581237248  | antena3com     | {&amp;quot;indices&amp;quot;:[82,97],&amp;quot;text&amp;quot;:&amp;quot;MarDePlástico8&amp;quot;}     |
+| 663858351978078208  | tacobell       | {&amp;quot;indices&amp;quot;:[12,28],&amp;quot;text&amp;quot;:&amp;quot;TacoEmojiEngine&amp;quot;}    |
+| 663858351990697984  | tacobell       | {&amp;quot;indices&amp;quot;:[14,30],&amp;quot;text&amp;quot;:&amp;quot;TacoEmojiEngine&amp;quot;}    |
+| 663858553329815553  | CollegeHumor   | {&amp;quot;indices&amp;quot;:[0,14],&amp;quot;text&amp;quot;:&amp;quot;TheCrunchBowl&amp;quot;}       |
+| 663858746251042816  | tacobell       | {&amp;quot;indices&amp;quot;:[12,28],&amp;quot;text&amp;quot;:&amp;quot;TacoEmojiEngine&amp;quot;}    |
+| 663859039831486465  | VctorClavijo   | {&amp;quot;indices&amp;quot;:[14,23],&amp;quot;text&amp;quot;:&amp;quot;Carlos10&amp;quot;}           |
+| 663859115358158848  | FarnamHorse    | {&amp;quot;indices&amp;quot;:[0,11],&amp;quot;text&amp;quot;:&amp;quot;DidYouKnow&amp;quot;}          |
+| 663859161503928320  | vpelham        | {&amp;quot;indices&amp;quot;:[20,29],&amp;quot;text&amp;quot;:&amp;quot;feminist&amp;quot;}           |
+| 663859161503928320  | vpelham        | {&amp;quot;indices&amp;quot;:[127,136],&amp;quot;text&amp;quot;:&amp;quot;feminism&amp;quot;}         |
+| 663859312469651456  | AlPrimerToque  | {&amp;quot;indices&amp;quot;:[0,18],&amp;quot;text&amp;quot;:&amp;quot;LorenzoEnOndaCero&amp;quot;}   |
+| 663859425715834880  | NewsTalk770    | {&amp;quot;indices&amp;quot;:[82,91],&amp;quot;text&amp;quot;:&amp;quot;yycroads&amp;quot;}           |
+| 663859425715834880  | NewsTalk770    | {&amp;quot;indices&amp;quot;:[92,103],&amp;quot;text&amp;quot;:&amp;quot;yyctraffic&amp;quot;}        |
+| 663859471844810752  | BrentASJax     | {&amp;quot;indices&amp;quot;:[70,83],&amp;quot;text&amp;quot;:&amp;quot;FirstAlertWX&amp;quot;}       |
+| 663859530598514688  | simpsonwhnt    | {&amp;quot;indices&amp;quot;:[102,111],&amp;quot;text&amp;quot;:&amp;quot;valleywx&amp;quot;}         |
++---------------------+----------------+-------------------------------------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;You can probably guess where I’m heading by now. A &lt;code&gt;COUNT()&lt;/code&gt; and &lt;code&gt;GROUP BY&lt;/code&gt; on a table like this can give us the number
+hashtags in each tweet. So let’s make a temporary reference to this query’s output with Drill’s &amp;lsquo;view&amp;rsquo; functionality. To
+do this we switch to the local file system’s temporary workspace and then run a CREATE VIEW command:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-sql&#34;&gt;&amp;gt; USE dfs.tmp;
+&amp;gt; CREATE VIEW hashtags AS SELECT tw.id `Tweet Id`, tw.`user`.screen_name `Screen Name`, FLATTEN(tw.entities.hashtags) `Hashtags` FROM dfs.`/path/to/tweets.small.json` tw WHERE tw.entities.hashtags[0].text IS NOT NULL AND tw.`user`.verified = true;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And now we’re ready to query our &amp;lsquo;hashtags&amp;rsquo; view to sort verified tweets by the number of hashtags.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-sql&#34;&gt;  SELECT `Tweet Id`, `Screen Name`, COUNT(`Tweet Id`) `Num Hashtags`
+    FROM hashtags
+GROUP BY `Tweet Id`, `Screen Name`
+ORDER BY `Num Hashtags` DESC
+   LIMIT 15;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;pre&gt;&lt;code&gt;+---------------------+------------------+---------------+
+|      Tweet Id       |   Screen Name    | Num Hashtags  |
++---------------------+------------------+---------------+
+| 663860369459384320  | SOFIALAMA        | 4             |
+| 663861480945664004  | ChrisMillerKUTV  | 3             |
+| 663861938103930880  | XboxFR           | 3             |
+| 663862705674133504  | sputnik_TR       | 2             |
+| 663862542079557633  | WHO              | 2             |
+| 663862743427076096  | ljcisneros       | 2             |
+| 663861338310053888  | joelcomm         | 2             |
+| 663859161503928320  | vpelham          | 2             |
+| 663861027948249088  | joemaalouftv     | 2             |
+| 663859425715834880  | NewsTalk770      | 2             |
+| 663861791303274497  | DezMandamentos   | 2             |
+| 663860684006952960  | RogerCookMLA     | 2             |
+| 663859799004581888  | DPostSports      | 1             |
+| 663859702535553024  | PrimerImpacto    | 1             |
+| 663859039831486465  | VctorClavijo     | 1             |
++---------------------+------------------+---------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Ta da!&lt;/p&gt;
+
+&lt;p&gt;But views aren’t just for simplifying SQL statements. For instance, you could also employ a view to create a shortcut to
+a query that joins several different files and/or databases. And since views only store queries and not data, you can
+make a lot of them without worrying about consuming the amount of disk space associated with table creation.&lt;/p&gt;
+
+&lt;p&gt;So to recap: In this post I&amp;rsquo;ve showcased how to deal with complicated nested JSON data in Drill, while also
+demonstrating how a &amp;lsquo;view&amp;rsquo; can improve the flow and readability of your analysis.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Finding corrupt JSON records in MongoDB</title>
+      <link>/kstirman.github.io/bookshelf/blog/finding-corrupt-JSON-records-in-MongoDB/</link>
+      <pubDate>Mon, 30 Nov 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/finding-corrupt-JSON-records-in-MongoDB/</guid>
+      <description>&lt;p&gt;A few weeks ago I mangled a MongoDB collection I was working with by importing a file I&amp;rsquo;d corrupted with a manual edit.
+The change I introduced was small, but serious enough to cause my Drill queries to fail. In this post I&amp;rsquo;m going to
+simulate this situation with an intentionally besmirched JSON file imported into MongoDB.&lt;/p&gt;
+
+&lt;p&gt;Today&amp;rsquo;s data set comes from some tweets that I pulled from Twitter&amp;rsquo;s streaming API. So let&amp;rsquo;s try to use Drill to query
+for some tweet id&amp;rsquo;s:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT id FROM mongo.tweets.small;
+Error: SYSTEM ERROR: IllegalArgumentException: You tried to write a VarChar type when you are using a ValueWriter of
+type NullableBigIntWriterImpl.
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Annnnd: No luck!&lt;/p&gt;
+
+&lt;p&gt;But can I at least look at the first 10 values?&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT id FROM mongo.tweets.small LIMIT 10;
+Error: SYSTEM ERROR: IllegalArgumentException: You tried to write a VarChar type when you are using a ValueWriter of
+type NullableBigIntWriterImpl.
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Still nothing. But let&amp;rsquo;s take a close look at the error message&amp;mdash;it looks like Drill is upset about about variable
+types. This is a good time to switch on Drill&amp;rsquo;s &lt;code&gt;union_type&lt;/code&gt; functionality, which will allow us to query a column that
+has multiple types of data.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; ALTER SYSTEM SET `exec.enable_union_type` = true;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now let&amp;rsquo;s ask for the &amp;lsquo;tweet id&amp;rsquo; value again, and this time tack on a column that tells us the type of the variable.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT id, TYPEOF(id) type FROM mongo.tweets.small LIMIT 10;
++---------------------+---------+
+|         id          |  type   |
++---------------------+---------+
+| 663858171623030785  | BIGINT  |
+| 663858171635589120  | BIGINT  |
+| 663858171627245572  | BIGINT  |
+| 663858171631374336  | BIGINT  |
+| 663858171631415296  | BIGINT  |
+| 663858171648184320  | BIGINT  |
+| 663858171635625984  | BIGINT  |
+| 663858171623043072  | BIGINT  |
+| 663858171618791424  | BIGINT  |
+| 663858171627175936  | BIGINT  |
++---------------------+---------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Looks like &amp;lsquo;BIGINT&amp;rsquo; is the standard type for the &amp;lsquo;id&amp;rsquo; values. So is there any case in which the type is &lt;em&gt;not&lt;/em&gt; equal to
+&amp;lsquo;BIGINT&amp;rsquo;? Let&amp;rsquo;s use this query:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT id, TYPEOF(id) type FROM mongo.tweets.small WHERE TYPEOF(id) NOT LIKE &#39;BIGINT&#39;;
++---------------------+----------+
+|         id          |   type   |
++---------------------+----------+
+| 663858171627352065  | VARCHAR  |
++---------------------+----------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Gotcha! I now have the offending tweet id in hand, so if I want to I can go back and fix the JSON file I imported. (In
+this case I had put quotes around the value, which caused it to read in as a string and not a number. Removing those
+quotes will do the trick and make the file read correctly.)&lt;/p&gt;
+
+&lt;p&gt;This makes for a fairly quick and easy way to hunt down issues in corrupted databases. Try it out next time you find
+yourself struggling with something that looks like a type error.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Using SQL to interface with Google Analytics data stored on Amazon S3</title>
+      <link>/kstirman.github.io/bookshelf/blog/using-SQL-to-interface-with-Google-Analytics-data-stored-on-Amazon-S3/</link>
+      <pubDate>Tue, 20 Oct 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/using-SQL-to-interface-with-Google-Analytics-data-stored-on-Amazon-S3/</guid>
+      <description>
+
+&lt;h2 id=&#34;introduction&#34;&gt;Introduction&lt;/h2&gt;
+
+&lt;p&gt;In the realm of web analytics, Google&amp;rsquo;s presence remains formidable. And it&amp;rsquo;s no surprise&amp;mdash;as a free service with a
+brain-dead easy setup and a wide range of collected user information, Google Analytics has a lot going for it. But if
+you&amp;rsquo;d like to move away from the standard Analytics web interface, what are your options? The intended audience for this
+article is those who might wish for a little more flexibility with their Google Analytics data.&lt;/p&gt;
+
+&lt;p&gt;An excellent tool for accomplishing this flexibility is Apache Drill. Drill is a piece of open source software that&amp;rsquo;s
+capable of providing a standard SQL command-line interface to a wide range of data types stored in a variety of ways. In
+this application we&amp;rsquo;ll be using Drill to talk to some JSON data retrieved using the Google Analytics API and stored on
+Amazon S3.&lt;/p&gt;
+
+&lt;h2 id=&#34;accessing-the-google-analytics-api-from-python&#34;&gt;Accessing the Google Analytics API from Python&lt;/h2&gt;
+
+&lt;p&gt;Google Analytics can be interfaced via a number of different languages, but in this example we&amp;rsquo;ll constrain ourselves
+to the Python API. The necessary files are easily installed via the Python package manager &lt;code&gt;pip&lt;/code&gt; on the command line:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ sudo pip install --upgrade google-api-python-client
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The next step is to generate the credentials necessary to use the Google Analytics API from within a script. To do this
+log in to &lt;a href=&#34;http://console.developers.google.com&#34;&gt;console.developers.google.com&lt;/a&gt; and create a new project. With your new project
+selected we need to first enable the Analytics API. Click on &amp;ldquo;APIs&amp;rdquo; under &amp;ldquo;APIs &amp;amp; auth&amp;rdquo;, and then select &amp;ldquo;Analytics API&amp;rdquo;
+in the &amp;ldquo;Advertising APIs&amp;rdquo; grouping. In the page that shows up next, click &amp;ldquo;Enable API.&amp;rdquo; Now it&amp;rsquo;s time to go to
+&amp;ldquo;Credentials&amp;rdquo; on the left column, and click &amp;ldquo;Add credentials.&amp;rdquo; Select &amp;ldquo;Service account&amp;rdquo; from the drop down, and &amp;ldquo;P12&amp;rdquo;
+before hitting the &amp;ldquo;Create&amp;rdquo; button.&lt;/p&gt;
+
+&lt;p&gt;This action will download a &lt;code&gt;.p12&lt;/code&gt; file to your computer that we&amp;rsquo;ll need later for the script, and then forward you to a
+page with a listing of your service accounts. The email address you see in the left column will need to be added to your
+Google Analytics settings. Head over to &lt;a href=&#34;http://analytics.google.com&#34;&gt;analytics.google.com&lt;/a&gt;, click &amp;ldquo;Admin&amp;rdquo; at the top, select
+&amp;ldquo;User Management&amp;rdquo; from the left, and then paste the email address you saw listed for your service account into the &amp;ldquo;Add
+permissions for:&amp;rdquo; box.  From here just click &amp;ldquo;Add&amp;rdquo; and you&amp;rsquo;re done doing the web configuration necessary for making
+Google Analytics to work with a script.&lt;/p&gt;
+
+&lt;p&gt;&lt;br&gt;
+&lt;br&gt;
+&lt;p style=&#34;text-align: center;&#34;&gt;
+&lt;img style=&#34;max-width: 100%;&#34; src=&#34;kstirman.github.io/bookshelf/img/analytics.png&#34;&gt;
+&lt;/p&gt;
+&lt;p style=&#34;text-align: center; font-style: italic;&#34;&gt;You need to add the email associated with your service account to
+your Google Analytics in order to enable API access from the script.&lt;/p&gt;
+&lt;br&gt;
+&lt;br&gt;&lt;/p&gt;
+
+&lt;h2 id=&#34;using-amazon-s3-from-python&#34;&gt;Using Amazon S3 from Python&lt;/h2&gt;
+
+&lt;p&gt;The example script included in this article will do a couple different things: First, it exposes a specified set of
+Google Analytics data as a dump to a JSON file, and second, it uploads this dumped data to the cloud by way of Amazon
+S3.  In order for this second task to succeed, we also to need to ensure that the script has access to the necessary
+Amazon Web Services credentials by going to &lt;a href=&#34;http://console.aws.amazon.com/iam/home&#34;&gt;console.aws.amazon.com/iam/home&lt;/a&gt;. On this
+page click &amp;ldquo;Users&amp;rdquo; on the left, and then select your username from the list that shows up. Then scroll down to the
+&amp;ldquo;Security Credentials&amp;rdquo; section and click the button that says &amp;ldquo;Create Access Key.&amp;rdquo; Next hit &amp;ldquo;Download Credentials&amp;rdquo; to
+retrieve a file called &lt;code&gt;credentials.csv&lt;/code&gt;.  The values from this file need to be placed in &lt;code&gt;~/.aws/credentials&lt;/code&gt; in the
+following way:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;[default]
+aws_access_key_id = ACCESSKEYID_FROM_CREDENTIALS_CSV
+aws_secret_access_key = SECRETACCESSKEY_FROM_CREDENTIALS_CSV
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Finally, you&amp;rsquo;ll need to install the Python package necessary to access your S3 storage via a script:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;pip install boto3
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;example-python-script-for-dumping-google-analytics-to-s3&#34;&gt;Example Python script for dumping Google Analytics to S3&lt;/h2&gt;
+
+&lt;p&gt;Now we&amp;rsquo;re finally ready to take a look at the example script, which I&amp;rsquo;ve called &lt;code&gt;ga_dump.py&lt;/code&gt;:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-python&#34;&gt;# Portions of this code are based heavily on Google&#39;s HelloAnalytics.py exmaple:
+# https://developers.google.com/analytics/devguides/reporting/core/v3/quickstart/service-py
+# As such, this software is covered under the Apache 2.0 License:
+# http://www.apache.org/licenses/LICENSE-2.0
+
+import httplib2
+import sys
+import json
+
+import boto3
+
+from apiclient.discovery import build
+from oauth2client import client, file, tools
+from oauth2client.client import SignedJwtAssertionCredentials
+
+# Global variables that hold information relevant to your GA access
+ga_key_file_name = &amp;quot;PATH TO YOUR .p12 KEY FILE FROM DEV CONSOLE&amp;quot;
+ga_service_email = &amp;quot;SERVICE EMAIL CREATED IN DEV CONSOLE&amp;quot;
+
+# Global variable that holds the name of the S3 bucket that you&#39;re dumping to
+my_s3_bucket_name = &amp;quot;NAME OF YOUR AMAZON S3 BUCKET&amp;quot;
+
+# Create a service
+def get_ga_service():
+
+  print(&amp;quot;\nConnecting to Google Analytics...\n&amp;quot;)
+
+  f = open(ga_key_file_name, &#39;rb&#39;)
+  ga_key = f.read()
+  f.close()
+
+  ga_credentials = SignedJwtAssertionCredentials(ga_service_email, ga_key, scope=[&#39;https://www.googleapis.com/auth/analytics.readonly&#39;])
+
+  ga_api_name = &#39;analytics&#39;
+  ga_version = &#39;v3&#39;
+
+  ga_service = build(ga_api_name,ga_version, http=ga_credentials.authorize(httplib2.Http()))
+
+  return ga_service
+
+# Get a profile id from the service
+# By default gets the id for the the first account, property, and view
+def get_ga_id(ga_service, acc_num = 0, prop_num = 0, view_num = 0):  
+
+  print(&amp;quot;Using the following settings:\n&amp;quot;)
+
+  try:
+    acc = ga_service.management().accounts().list().execute().get(&#39;items&#39;)[acc_num]
+    acc_id = acc.get(&#39;id&#39;)
+    print(&amp;quot;Google Analytics account: &amp;quot; + acc.get(&#39;name&#39;))
+
+  except:
+    print(&amp;quot;Error finding account&amp;quot;)
+    return None
+
+  try:
+    prop = ga_service.management().webproperties().list(accountId=acc_id).execute().get(&#39;items&#39;)[prop_num]
+    prop_id = prop.get(&#39;id&#39;)
+    print(&amp;quot;Property name: &amp;quot; + prop.get(&#39;name&#39;))
+  except:
+    print(&amp;quot;Error finding property&amp;quot;)
+    return None
+
+  try:
+    view = ga_service.management().profiles().list(accountId=acc_id,webPropertyId=prop_id).execute().get(&#39;items&#39;)[view_num]
+    view_id = view.get(&#39;id&#39;)
+    print(&amp;quot;Analytics view name: &amp;quot; + view.get(&#39;name&#39;) +&amp;quot;\n&amp;quot;)
+  except:
+    print(&amp;quot;Error finding view&amp;quot;)
+    return None
+
+  return view_id
+
+def pretty_json(obj):
+  return json.dumps(obj, sort_keys=True, separators=(&#39;,&#39;,&#39;:&#39;), indent=4)
+
+# Dumps to three files:
+# One for geographic (geo) data, one for data about acquisition (acq), and another about devices used (ev)
+def fetch_and_dump(ga_service,ga_id):
+
+  # Google Analytics metrics we want
+  ga_metrics = &#39;ga:users,\
+                ga:newusers,\
+                ga:sessions,\
+                ga:bounces,\
+                ga:sessionDuration,\
+                ga:hits&#39;
+
+  dims_date = &#39;,ga:date,ga:hour&#39;
+
+  # Sets of dimensions to look at
+  ga_dims_geo = &#39;ga:country,\
+                 ga:region,\
+                 ga:city,\
+                 ga:continent,\
+                 ga:language&#39;+dims_date
+
+  ga_dims_acq = &#39;ga:source,\
+                 ga:medium,\
+                 ga:socialNetwork&#39;+dims_date
+
+  ga_dims_dev = &#39;ga:browser,\
+                 ga:browserVersion,\
+                 ga:screenResolution,\
+                 ga:deviceCategory&#39;+dims_date
+
+
+
+
+  data_geo = ga_service.data().ga().get(ids=&#39;ga:&#39;+ga_id,start_date=sys.argv[1], end_date=sys.argv[1], metrics=ga_metrics, dimensions=ga_dims_geo).execute()
+  data_acq = ga_service.data().ga().get(ids=&#39;ga:&#39;+ga_id,start_date=sys.argv[1], end_date=sys.argv[1], metrics=ga_metrics, dimensions=ga_dims_acq).execute()
+  data_dev = ga_service.data().ga().get(ids=&#39;ga:&#39;+ga_id,start_date=sys.argv[1], end_date=sys.argv[1], metrics=ga_metrics, dimensions=ga_dims_dev).execute()
+
+  file_geo = &#39;google_analytics_geo_&#39;+sys.argv[1]+&#39;.json&#39;
+  file_acq = &#39;google_analytics_acq_&#39;+sys.argv[1]+&#39;.json&#39;
+  file_dev = &#39;google_analytics_dev_&#39;+sys.argv[1]+&#39;.json&#39;
+
+  f_geo = open(file_geo,&#39;w&#39;)
+  f_acq = open(file_acq,&#39;w&#39;)
+  f_dev = open(file_dev,&#39;w&#39;)
+
+  f_geo.write(pretty_json(data_geo))
+  f_acq.write(pretty_json(data_acq))
+  f_dev.write(pretty_json(data_dev))
+
+  f_geo.close()
+  f_acq.close()
+  f_dev.close()
+
+  # return a list of the dump files
+  file_list = [file_geo, file_acq, file_dev]
+
+  return file_list
+
+# Upload dumped files to Amazon cloud storage
+def upload_to_s3(file_list):
+  aws_s3 = boto3.resource(&#39;s3&#39;)
+
+  # Make a bucket if we need to
+  aws_s3.create_bucket(Bucket=my_s3_bucket_name)
+
+  for file_name in file_list:
+    aws_s3.Bucket(my_s3_bucket_name).put_object(Key=file_name, Body = open(file_name, &#39;rb&#39;))
+
+# Main program execution
+my_service = get_ga_service()
+
+if my_service == None:
+  print(&amp;quot;Error connecting to Google Analytics!&amp;quot;)
+
+else:
+  my_id = get_ga_id(my_service)
+
+  print(&amp;quot;Dumping Analytics data to files...&amp;quot;)
+  files = fetch_and_dump(my_service,my_id)
+  print(&amp;quot;Done!&amp;quot;)
+
+  print(&amp;quot;\nUploading to Amazon S3 storage...&amp;quot;)
+  upload_to_s3(files)
+  print(&amp;quot;Done!&amp;quot;)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The script takes a single command line argument: an ISO 8601 formatted date that specifies which day to dump Google
+Analytics data from. For instance to retrieve the previous day&amp;rsquo;s data, you could run:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ python ga-dump.py `date -v -1d &amp;quot;+%Y-%m-%d&amp;quot;`
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;One possible use case would involve running this command at regular intervals via the unix cron daemon. As written, the
+script outputs three JSON files: one for visitor geographic data, one for visitor acquisition data, and one for data
+about the kinds of devices visitors are using.&lt;/p&gt;
+
+&lt;p&gt;Before running, don&amp;rsquo;t forget to change the global variables at the top of the listing to match your Google Analytics
+credentials and S3 bucketname! (Also: users of OS X will need to implement &lt;a href=&#34;https://developers.google.com/gmail/api/quickstart/python#troubleshooting&#34;&gt;this
+fix&lt;/a&gt; before the script can run).&lt;/p&gt;
+
+&lt;h2 id=&#34;setting-up-apache-drill-for-use-with-s3&#34;&gt;Setting up Apache Drill for use with S3&lt;/h2&gt;
+
+&lt;p&gt;Now that we can toss dumps of Google Analytics up to the AWS cloud without much effort, it&amp;rsquo;s time to implement Drill as
+an SQL interface to the data. Installing Drill itself is an extremely &lt;a href=&#34;https://drill.apache.org/docs/installing-drill-on-linux-and-mac-os-x/&#34;&gt;simple
+process&lt;/a&gt; (all you need is Java and the Drill
+tarball), but we&amp;rsquo;ll need to do a little configuration in order to talk to our S3 bucket.&lt;/p&gt;
+
+&lt;p&gt;First, edit the file &lt;code&gt;core-site.xml&lt;/code&gt; in the &lt;code&gt;./conf&lt;/code&gt; directory of the Drill install, replacing the relevant parts with
+your Amazon S3 credentials:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;lt;configuration&amp;gt;
+
+    &amp;lt;property&amp;gt;
+        &amp;lt;name&amp;gt;fs.s3a.access.key&amp;lt;/name&amp;gt;
+        &amp;lt;value&amp;gt;ENTER_YOUR_ACCESSKEY&amp;lt;/value&amp;gt;
+    &amp;lt;/property&amp;gt;
+
+    &amp;lt;property&amp;gt;
+        &amp;lt;name&amp;gt;fs.s3a.secret.key&amp;lt;/name&amp;gt;
+        &amp;lt;value&amp;gt;ENTER_YOUR_SECRETKEY&amp;lt;/value&amp;gt;
+    &amp;lt;/property&amp;gt;
+
+&amp;lt;/configuration&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Next, start up the embdedded (single machine) version of Drill&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;~/apache-drill/bin/drill-embedded
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;so we can use the Drill Web Console located at &lt;a href=&#34;http://localhost:8047&#34;&gt;http://localhost:8047&lt;/a&gt;. We&amp;rsquo;ll proceed by making a copy of the &amp;lsquo;dfs&amp;rsquo;
+storage plugin. To do this go to the &amp;lsquo;Storage&amp;rsquo; page, and hit &amp;lsquo;Update&amp;rsquo; next to &amp;lsquo;dfs&amp;rsquo;, making a copy of the text
+listed in the &amp;ldquo;Configuration&amp;rdquo; box that&amp;rsquo;s displayed on the next page. Now type a name for our new S3 plugin into the &amp;ldquo;New
+Storage Plugin&amp;rdquo; box at the bottom of the previous page (&amp;ldquo;s3-ga&amp;rdquo; might make a good choice). Place the text for the &amp;lsquo;dfs&amp;rsquo;
+plugin into the box, editing &lt;code&gt;&amp;quot;connection&amp;quot;: &amp;quot;file:///&amp;quot;&lt;/code&gt; so that it specifies S3 and the name of your bucket instead, as
+in &lt;code&gt;&amp;quot;connection&amp;quot;: &amp;quot;s3a://example.bucketname&amp;quot;&lt;/code&gt;. Hit &amp;ldquo;Create&amp;rdquo; to make the plugin.&lt;/p&gt;
+
+&lt;h2 id=&#34;querying-google-analytics-json-with-apache-drill&#34;&gt;Querying Google Analytics JSON with Apache Drill&lt;/h2&gt;
+
+&lt;p&gt;Now we&amp;rsquo;re ready to start querying our Google Analytics JSON using Drill! Try a simple &lt;code&gt;SELECT *&lt;/code&gt; from the &lt;code&gt;drill-embedded&lt;/code&gt; prompt:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT * FROM `s3-ga`.`google_analytics_geo_2015-10-19.json`;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;You may notice that the results of this query are not exactly&amp;hellip; beautiful. This is because the structure of a Google
+Analytics JSON dump isn&amp;rsquo;t compatible with simple queries like this. And that&amp;rsquo;s okay! We can easily work around that with
+some slightly more sophisticated SQL (Hey, if you wanted easy you&amp;rsquo;d be using the web interface, right?).&lt;/p&gt;
+
+&lt;p&gt;To list information about the columns of our data set, we can use the following command:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT ROW_NUMBER() OVER(ORDER BY 1) - 1 AS `Column Index`, KVGEN(FLATTEN(ga_table.columnHeaders))[2] AS `Column Info`
+&amp;gt; FROM `s3-ga`.`google_analytics_geo_2015-10-19.json` ga_table;
++---------------+----------------------------------------------+
+| Column Index  |                 Column Info                  |
++---------------+----------------------------------------------+
+| 0             | {&amp;quot;key&amp;quot;:&amp;quot;name&amp;quot;,&amp;quot;value&amp;quot;:&amp;quot;ga:country&amp;quot;}          |
+| 1             | {&amp;quot;key&amp;quot;:&amp;quot;name&amp;quot;,&amp;quot;value&amp;quot;:&amp;quot;ga:region&amp;quot;}           |
+| 2             | {&amp;quot;key&amp;quot;:&amp;quot;name&amp;quot;,&amp;quot;value&amp;quot;:&amp;quot;ga:city&amp;quot;}             |
+| 3             | {&amp;quot;key&amp;quot;:&amp;quot;name&amp;quot;,&amp;quot;value&amp;quot;:&amp;quot;ga:continent&amp;quot;}        |
+| 4             | {&amp;quot;key&amp;quot;:&amp;quot;name&amp;quot;,&amp;quot;value&amp;quot;:&amp;quot;ga:language&amp;quot;}         |
+| 5             | {&amp;quot;key&amp;quot;:&amp;quot;name&amp;quot;,&amp;quot;value&amp;quot;:&amp;quot;ga:date&amp;quot;}             |
+| 6             | {&amp;quot;key&amp;quot;:&amp;quot;name&amp;quot;,&amp;quot;value&amp;quot;:&amp;quot;ga:hour&amp;quot;}             |
+| 7             | {&amp;quot;key&amp;quot;:&amp;quot;name&amp;quot;,&amp;quot;value&amp;quot;:&amp;quot;ga:users&amp;quot;}            |
+| 8             | {&amp;quot;key&amp;quot;:&amp;quot;name&amp;quot;,&amp;quot;value&amp;quot;:&amp;quot;ga:newusers&amp;quot;}         |
+| 9             | {&amp;quot;key&amp;quot;:&amp;quot;name&amp;quot;,&amp;quot;value&amp;quot;:&amp;quot;ga:sessions&amp;quot;}         |
+| 10            | {&amp;quot;key&amp;quot;:&amp;quot;name&amp;quot;,&amp;quot;value&amp;quot;:&amp;quot;ga:bounces&amp;quot;}          |
+| 11            | {&amp;quot;key&amp;quot;:&amp;quot;name&amp;quot;,&amp;quot;value&amp;quot;:&amp;quot;ga:sessionDuration&amp;quot;}  |
+| 12            | {&amp;quot;key&amp;quot;:&amp;quot;name&amp;quot;,&amp;quot;value&amp;quot;:&amp;quot;ga:hits&amp;quot;}             |
++---------------+----------------------------------------------+
+13 rows selected (1.739 seconds)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And now that we know the column index for &amp;lsquo;ga:city&amp;rsquo; is &amp;lsquo;2&amp;rsquo; we can use this query to inspect what cities visitors came
+from on the date of the file:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT DISTINCT FLATTEN(ga_table.`rows`)[2] AS Cities FROM `s3-ga`.`google_analytics_geo_2015-10-19.json` ga_table;
++-------------+
+|   Cities    |
++-------------+
+| (not set)   |
+| Almaty      |
+| Pushkino    |
+| Samara      |
+| Seoul       |
+| Tolyatti    |
+| Tula        |
+| Volgodonsk  |
++-------------+
+8 rows selected (1.292 seconds)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;This simple example is fine, but as I pointed out before the advantage of this approach is the flexibility you gain in
+making queries. So let&amp;rsquo;s set our sights on doing something that&amp;rsquo;s impossible to accomplish even in the &amp;lsquo;Custom Reports&amp;rsquo;
+interface of the Google Analytics web GUI: inspecting more than 5 analysis dimensions simultaneously.&lt;/p&gt;
+
+&lt;p&gt;The following statement asks for the total number of sessions along the dimensions of date, hour, browser name, browser
+version, screen resolution, and type of device. Formulating a statement that analyzes several columns of data is
+somewhat more complicated than our previous single-column example, and I ended up constructing mine out of two
+subqueries:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-sql&#34;&gt;  SELECT `Date`, `Hour`, Browser, Version, Resolution, Device, SUM(CAST(Sessions AS INTEGER)) `Total Sessions`
+    FROM (SELECT data[4] `Date`, data[5] `Hour`, data[0] Browser, data[1] Version, data[2] Resolution, data[3] Device, data[8] Sessions
+            FROM (SELECT FLATTEN(ga_table.`rows`) data
+                    FROM `s3-ga`.`google_analytics_dev_2015-10-19.json` ga_table))
+GROUP BY `Date`, `Hour`, Browser, Version, Resolution, Device
+ORDER BY `Date`, `Hour`;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Here the innermost query FLATTENs the data while the next one picks out columns and assigns them names. The main
+query handles tallying the total sessions and organizing the data.&lt;/p&gt;
+
+&lt;p&gt;Unfortunately my personal site doesn&amp;rsquo;t get enough traffic to take advantage of the GROUP BY, but the results look like
+this:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;+-----------+-------+------------+-----------------+-------------+----------+-----------------+
+|   Date    | Hour  |  Browser   |     Version     | Resolution  |  Device  | Total Sessions  |
++-----------+-------+------------+-----------------+-------------+----------+-----------------+
+| 20151019  | 03    | Safari     | 8.0             | 1366x768    | mobile   | 1               |
+| 20151019  | 04    | YaBrowser  | 44.0.2403.3043  | 1024x768    | desktop  | 1               |
+| 20151019  | 04    | Chrome     | 40.0.2214.111   | (not set)   | desktop  | 2               |
+| 20151019  | 05    | YaBrowser  | 44.0.2403.3043  | 1024x768    | desktop  | 1               |
+| 20151019  | 07    | Safari     | 8.0             | 1366x768    | mobile   | 1               |
+| 20151019  | 10    | Chrome     | 39.0.2171.71    | 1024x768    | desktop  | 1               |
+| 20151019  | 10    | Safari     | 8.0             | 1366x768    | mobile   | 1               |
+| 20151019  | 11    | Safari     | 8.0             | 1366x768    | mobile   | 1               |
+| 20151019  | 12    | Safari     | 8.0             | 1366x768    | mobile   | 0               |
+| 20151019  | 12    | Chrome     | 46.0.2490.71    | 1024x768    | desktop  | 1               |
+| 20151019  | 13    | Safari     | 8.0             | 1366x768    | mobile   | 1               |
+| 20151019  | 14    | Safari     | 8.0             | 1366x768    | mobile   | 1               |
+| 20151019  | 15    | Safari     | 8.0             | 1366x768    | mobile   | 1               |
+| 20151019  | 16    | Safari     | 8.0             | 1366x768    | mobile   | 1               |
+| 20151019  | 18    | Safari     | 8.0             | 1366x768    | mobile   | 1               |
+| 20151019  | 19    | Safari     | 8.0             | 1366x768    | mobile   | 1               |
+| 20151019  | 21    | Safari     | 8.0             | 1366x768    | mobile   | 2               |
+| 20151019  | 21    | Chrome     | 39.0.2171.71    | 1024x768    | desktop  | 1               |
++-----------+-------+------------+-----------------+-------------+----------+-----------------+
+18 rows selected (2.086 seconds)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;While it&amp;rsquo;s definitely possible to interface with the data this way, Apache Drill offers an alternative solution in the
+form of custom user defined functions. In my &lt;a href=&#34;kstirman.github.io/bookshelf/blog/querying-google-analytics-json-with-a-custom-sql-function/&#34;&gt;next
+post&lt;/a&gt;, I&amp;rsquo;ll show you how to implement a
+GAHELPER() function that makes working with Google Analytics data from the Drill command line significantly easier.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

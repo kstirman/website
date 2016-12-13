@@ -1,0 +1,844 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/custom-functions/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/custom-functions/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Parsing EPA vehicle data for linear correlations in MPG ratings</title>
+      <link>/kstirman.github.io/bookshelf/blog/parsing-epa-vehicle-data-for-linear-correlations-in-mpg-ratings/</link>
+      <pubDate>Thu, 11 Feb 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/parsing-epa-vehicle-data-for-linear-correlations-in-mpg-ratings/</guid>
+      <description>&lt;p&gt;In &lt;a href=&#34;http://www.dremio.com/blog/calculating-pearsons-r-using-a-custom-sql-function/&#34;&gt;the previous day&amp;rsquo;s post&lt;/a&gt; I
+demonstrated how to code a custom aggregate function that can process two sets of data points into their corresponding
+Pearson&amp;rsquo;s &lt;em&gt;r&lt;/em&gt; value, which is a useful indicator of variable correlation. Today I&amp;rsquo;m going to put that function to the
+test on this &lt;a href=&#34;https://www.fueleconomy.gov/feg/download.shtml&#34;&gt;EPA data set&lt;/a&gt; that contains information about vehicles
+manufactured from model years 1984 to 2017. The two questions I&amp;rsquo;d like to answer are: 1.) Does the combined MPG rating
+for a car correlate with model year? and 2.) How does an engine&amp;rsquo;s displacement affect the combined MPG rating?&lt;/p&gt;
+
+&lt;p&gt;To begin with, I&amp;rsquo;m going to create two views that average over combined MPG for each of the other variables of interest.
+These are constructed as follows:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW year_mpg AS
+     SELECT CAST(`year` AS FLOAT) `year`, AVG(CAST(comb08 AS FLOAT)) mpg
+       FROM dfs.`/Users/ngriffith/Downloads/vehicles.csvh`
+   GROUP BY `year`
+   ORDER BY `year`;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;helps answer the first question about model years, while&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW displacement_mpg AS
+     SELECT CAST(displ AS FLOAT) displacement, AVG(CAST(comb08 AS FLOAT)) mpg
+       FROM dfs.`/Users/ngriffith/Downloads/vehicles.csvh`
+      WHERE displ NOT LIKE &#39;&#39;
+        AND displ NOT LIKE &#39;NA&#39;
+   GROUP BY displ
+   ORDER BY displacement;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;will allow us tackle the second one about engine sizes.&lt;/p&gt;
+
+&lt;p&gt;The first view looks like this:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT * FROM year_mpg;
++---------+---------------------+
+|  year   |         mpg         |
++---------+---------------------+
+| 1984.0  | 19.881873727087576  |
+| 1985.0  | 19.808348030570254  |
+| 1986.0  | 19.550413223140495  |
+| 1987.0  | 19.228548516439453  |
+| 1988.0  | 19.328318584070797  |
+| 1989.0  | 19.12575888985256   |
+| 1990.0  | 19.000927643784788  |
+| 1991.0  | 18.825971731448764  |
+| 1992.0  | 18.86262265834077   |
+| 1993.0  | 19.104300091491307  |
+| 1994.0  | 19.0122199592668    |
+| 1995.0  | 18.797311271975182  |
+| 1996.0  | 19.584734799482536  |
+| 1997.0  | 19.429133858267715  |
+| 1998.0  | 19.51847290640394   |
+| 1999.0  | 19.61150234741784   |
+| 2000.0  | 19.526190476190475  |
+| 2001.0  | 19.479692645444565  |
+| 2002.0  | 19.168205128205127  |
+| 2003.0  | 19.00095785440613   |
+| 2004.0  | 19.067736185383243  |
+| 2005.0  | 19.193825042881645  |
+| 2006.0  | 18.95923913043478   |
+| 2007.0  | 18.97868561278863   |
+| 2008.0  | 19.27632687447346   |
+| 2009.0  | 19.74070945945946   |
+| 2010.0  | 20.601442741208295  |
+| 2011.0  | 21.10353982300885   |
+| 2012.0  | 21.93755420641804   |
+| 2013.0  | 23.253164556962027  |
+| 2014.0  | 23.70114006514658   |
+| 2015.0  | 24.214953271028037  |
+| 2016.0  | 24.84784446322908   |
+| 2017.0  | 23.571428571428573  |
++---------+---------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Yup, it definitely looks like there&amp;rsquo;s a trend toward higher MPG. But let&amp;rsquo;s calculate the &lt;em&gt;r&lt;/em&gt; value:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT PCORRELATION(`year`, mpg) FROM year_mpg;
+Error: SYSTEM ERROR: SchemaChangeException: Failure while materializing expression.
+Error in expression at index -1.  Error: Missing function implementation: [pcorrelation(FLOAT4-REQUIRED,
+FLOAT8-OPTIONAL)].  Full expression: --UNKNOWN EXPRESSION--.
+...
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Oops! We got an error message instead of an &lt;em&gt;r&lt;/em&gt; value. That&amp;rsquo;s because my &lt;code&gt;PCORRELATION()&lt;/code&gt; function expects two variables
+that are nullable (&amp;lsquo;optional&amp;rsquo;), but the first one that&amp;rsquo;s getting passed is non-nullable (&amp;lsquo;required&amp;rsquo;). This situation is
+what led to the creation of &lt;a href=&#34;http://www.dremio.com/blog/managing-variable-type-nullability/&#34;&gt;this earlier article and its associated
+functions&lt;/a&gt; for stripping and adding nullability to
+variables. The &lt;code&gt;ADD_NULL_FLOAT()&lt;/code&gt; custom function from that piece is exactly what we need to turn &lt;code&gt;`years `&lt;/code&gt; into a
+variable type that &lt;code&gt;PCORRELATION()&lt;/code&gt; can accept.&lt;/p&gt;
+
+&lt;p&gt;So let&amp;rsquo;s try this again:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT PCORRELATION(ADD_NULL_FLOAT(`year`), mpg) FROM year_mpg;
++---------------------+
+|       EXPR$0        |
++---------------------+
+| 0.6870535033886027  |
++---------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Correlation confirmed! It&amp;rsquo;s not the strongest (that would be a value of 1.0), but it&amp;rsquo;s definitely there. Neat!&lt;/p&gt;
+
+&lt;p&gt;Now to take a look at how engine size related. The view I created contains this data:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT * FROM displacement_mpg;
++---------------+---------------------+
+| displacement  |         mpg         |
++---------------+---------------------+
+| 0.0           | 87.5                |
+| 0.6           | 39.0                |
+| 0.9           | 35.5                |
+| 1.0           | 37.5030303030303    |
+| 1.1           | 19.916666666666668  |
+| 1.2           | 30.81081081081081   |
+| 1.3           | 28.904255319148938  |
+| 1.4           | 30.658959537572255  |
+| 1.5           | 29.439592430858806  |
+| 1.6           | 26.48841961852861   |
+| 1.7           | 28.842105263157894  |
+| 1.8           | 24.91231463571889   |
+| 1.9           | 27.038277511961724  |
+| 2.0           | 24.032035928143713  |
+| 2.1           | 19.28301886792453   |
+| 2.2           | 22.07820419985518   |
+| 2.3           | 21.026008968609865  |
+| 2.4           | 22.373468300479487  |
+| 2.5           | 21.628227194492254  |
+| 2.6           | 18.123529411764707  |
+| 2.7           | 19.88589211618257   |
+| 2.8           | 18.463019250253293  |
+| 2.9           | 18.772727272727273  |
+| 3.0           | 19.428571428571427  |
+| 3.1           | 19.72156862745098   |
+| 3.2           | 18.25237191650854   |
+| 3.3           | 18.54698795180723   |
+| 3.4           | 18.473317865429234  |
+| 3.5           | 20.02212705210564   |
+| 3.6           | 19.188457008244995  |
+| 3.7           | 18.107468123861565  |
+| 3.8           | 19.115025906735752  |
+| 3.9           | 15.588815789473685  |
+| 4.0           | 16.738241308793455  |
+| 4.1           | 15.873684210526315  |
+| 4.2           | 16.05597014925373   |
+| 4.3           | 16.590775988286968  |
+| 4.4           | 17.094736842105263  |
+| 4.5           | 15.566666666666666  |
+| 4.6           | 16.6696269982238    |
+| 4.7           | 15.282548476454293  |
+| 4.8           | 15.813688212927756  |
+| 4.9           | 14.355113636363637  |
+| 5.0           | 15.2375             |
+| 5.2           | 13.063197026022305  |
+| 5.3           | 15.203412073490814  |
+| 5.4           | 13.902597402597403  |
+| 5.5           | 15.16243654822335   |
+| 5.6           | 14.0                |
+| 5.6           | 14.394736842105264  |
+| 5.7           | 14.780718336483933  |
+| 5.8           | 11.78125            |
+| 5.9           | 11.701183431952662  |
+| 6.0           | 14.462686567164178  |
+| 6.1           | 15.0                |
+| 6.1           | 14.454545454545455  |
+| 6.2           | 16.540930979133226  |
+| 6.3           | 13.705882352941176  |
+| 6.4           | 16.8                |
+| 6.5           | 14.81081081081081   |
+| 6.6           | 15.0                |
+| 6.7           | 13.0                |
+| 6.8           | 10.572463768115941  |
+| 7.0           | 17.4                |
+| 7.4           | 9.75                |
+| 8.0           | 12.347826086956522  |
+| 8.3           | 11.222222222222221  |
+| 8.4           | 15.6                |
++---------------+---------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Which, after making a similar adjustment using &lt;code&gt;ADD_NULL_FLOAT()&lt;/code&gt;, yields a correlation of:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT PCORRELATION(ADD_NULL_FLOAT(displacement), mpg) FROM displacement_mpg;
++---------------------+
+|       EXPR$0        |
++---------------------+
+| -0.679501632464044  |
++---------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;So combined average combined MPG is almost as strongly anti-correlated with engine size as it is correlated with model
+year. There&amp;rsquo;s a fairly clear linear dependence in both cases!&lt;/p&gt;
+
+&lt;p&gt;For my next couple articles I&amp;rsquo;ll be digging even deeper into statistical techniques by implementing and testing a Drill
+function to calculate the probability of events that follow a Poisson distribution. It&amp;rsquo;s shaping up to be a great
+couple of weeks to be reading the Dremio Blog if you&amp;rsquo;re curious about what custom-tuned &amp;lsquo;SQL on anything&amp;rsquo; software can
+do in terms of serious analysis.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Calculating Pearson&#39;s r using a custom SQL function</title>
+      <link>/kstirman.github.io/bookshelf/blog/calculating-pearsons-r-using-a-custom-SQL-function/</link>
+      <pubDate>Wed, 10 Feb 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/calculating-pearsons-r-using-a-custom-SQL-function/</guid>
+      <description>&lt;script type=&#34;text/javascript&#34;
+ src=&#34;http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML&#34;&gt;
+&lt;/script&gt;
+
+&lt;p&gt;Lately I&amp;rsquo;ve written a lot of custom functions to assist me in my example Drill analyses, but they&amp;rsquo;ve all been of the
+same fundamental type: They take one or more columns of a single row and process them into a single output. The &lt;a href=&#34;https://drill.apache.org/docs/develop-custom-functions-introduction/&#34;&gt;Drill
+documentation&lt;/a&gt; calls these &amp;ldquo;simple&amp;rdquo; functions.
+However there&amp;rsquo;s another class of functions lurking out there&amp;mdash;ones that can accept &lt;em&gt;many&lt;/em&gt; rows of data as input. We
+call them &amp;ldquo;aggregate&amp;rdquo; functions.&lt;/p&gt;
+
+&lt;p&gt;If you&amp;rsquo;re an experienced user of SQL, you&amp;rsquo;re already familiar with a few very common aggregate functions like &lt;code&gt;COUNT()&lt;/code&gt;
+and &lt;code&gt;SUM()&lt;/code&gt;, but you&amp;rsquo;ve probably never written one of your own. Today we&amp;rsquo;re going to change that!&lt;/p&gt;
+
+&lt;p&gt;As I&amp;rsquo;ve discussed in previous articles Drill already has some built-in statistics functions, but the goal of this post
+will be to expand those capabilities even further by implementing an aggregate function to calculate a value called
+Pearson&amp;rsquo;s &lt;em&gt;r&lt;/em&gt;. Values for &lt;em&gt;r&lt;/em&gt; vary from +1 to -1, and indicate the degree to which two variables are linearly correlated
+or anti-correlated, respectively. An &lt;em&gt;r&lt;/em&gt; value at or near 0 indicates that there is no linear relationship between the
+two sets of data points.&lt;/p&gt;
+
+&lt;p&gt;After looking on Wikipedia, the most Drill-friendly equation for Pearson&amp;rsquo;s &lt;em&gt;r&lt;/em&gt; is:&lt;/p&gt;
+
+&lt;p&gt;$$ r = \frac{n \sum x_i y_i - \sum x_i \sum y_i}{ \sqrt{n \sum x_i^2 - \left( \sum x_i \right)^2} \sqrt{n \sum y_i^2 -
+\left( \sum y_i \right)^2}} $$&lt;/p&gt;
+
+&lt;p&gt;where \( x_i \) and \( y_i \) are our data points, and \( n \) is the total number of them.&lt;/p&gt;
+
+&lt;p&gt;Once you&amp;rsquo;ve got a Maven project started for your Drill UDF (a guide is available in the &amp;ldquo;Downloading Maven and starting
+a new project&amp;rdquo; section of &lt;a href=&#34;http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/&#34;&gt;this
+article&lt;/a&gt;), take a look at the source
+for our Pearson&amp;rsquo;s &lt;em&gt;r&lt;/em&gt; function:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;package com.yourgroupidentifier.udf;
+
+import org.apache.drill.exec.expr.DrillAggFunc;
+import org.apache.drill.exec.expr.holders.IntHolder;
+import org.apache.drill.exec.expr.holders.NullableFloat8Holder;
+import org.apache.drill.exec.expr.holders.Float8Holder;
+
+import org.apache.drill.exec.expr.annotations.FunctionTemplate;
+
+import org.apache.drill.exec.expr.annotations.Param;
+import org.apache.drill.exec.expr.annotations.Workspace;
+import org.apache.drill.exec.expr.annotations.Output;
+
+@FunctionTemplate(
+        name = &amp;quot;pcorrelation&amp;quot;,
+        scope = FunctionTemplate.FunctionScope.POINT_AGGREGATE,
+        nulls = FunctionTemplate.NullHandling.INTERNAL
+)
+
+public class PCorrelation implements DrillAggFunc {
+
+    @Param
+    NullableFloat8Holder xInput;
+
+    @Param
+    NullableFloat8Holder yInput;
+
+    @Workspace
+    IntHolder numValues;
+
+    @Workspace
+    Float8Holder xSum;
+
+    @Workspace
+    Float8Holder ySum;
+
+    @Workspace
+    Float8Holder xSqSum;
+
+    @Workspace
+    Float8Holder ySqSum;
+
+    @Workspace
+    Float8Holder xySum;
+
+    @Output
+    Float8Holder output;
+
+    public void setup() {
+        // Initialize values
+        numValues.value = 0;
+        xSum.value = 0;
+        ySum.value = 0;
+        xSqSum.value = 0;
+        ySqSum.value = 0;
+        xySum.value = 0;
+    }
+
+    public void reset() {
+        // Initialize values
+        numValues.value = 0;
+        xSum.value = 0;
+        ySum.value = 0;
+        xSqSum.value = 0;
+        ySqSum.value = 0;
+        xySum.value = 0;
+    }
+
+    public void add() {
+
+        // Only proceed if both floats aren&#39;t nulls
+        if( (xInput.isSet == 1) || (yInput.isSet == 1) ) {
+
+            numValues.value++;
+
+            xSum.value += xInput.value;
+            ySum.value += yInput.value;
+
+            xSqSum.value += xInput.value * xInput.value;
+            ySqSum.value += yInput.value * yInput.value;
+
+            xySum.value += xInput.value * yInput.value;
+        }
+
+    }
+
+    public void output() {
+
+        float n = numValues.value;
+
+        double x = xSum.value;
+        double y = ySum.value;
+
+        double x2 = xSqSum.value;
+        double y2 = ySqSum.value;
+
+        double xy = xySum.value;
+
+        output.value = (n*xy - x*y)/(Math.sqrt(n*x2 - x*x)*Math.sqrt(n*y2 - y*y));
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Yes, that&amp;rsquo;s a chunk of code&amp;mdash;but it&amp;rsquo;s mostly this long because it takes a lot of variables to accomplish the &lt;em&gt;r&lt;/em&gt;
+calculation. Anyway, let&amp;rsquo;s talk about some differences between this aggregate function and the simple ones we&amp;rsquo;ve been
+writing up until now.&lt;/p&gt;
+
+&lt;p&gt;First, up in the function template the scope changes from &lt;code&gt;SIMPLE&lt;/code&gt; to &lt;code&gt;POINT_AGGREGATE&lt;/code&gt;, while the null handling is set
+to &lt;code&gt;INTERNAL&lt;/code&gt; instead of &lt;code&gt;NULL_IF_NULL&lt;/code&gt;. This is because aggregate functions need to determine on their own how to
+process null inputs, rather than let Drill handle it for them as we can do for most simple functions. You&amp;rsquo;ll also notice
+a new annotation, &lt;code&gt;@Workspace&lt;/code&gt;, which is used before variables that assist in the calculation of the result as the
+function moves through each row.&lt;/p&gt;
+
+&lt;p&gt;Another obvious difference is that aggregate functions implement a different set of methods than simple ones. The
+&lt;code&gt;setup()&lt;/code&gt; method remains the same, but &lt;code&gt;output()&lt;/code&gt; takes the place of &lt;code&gt;eval()&lt;/code&gt;. For each row that&amp;rsquo;s processed &lt;code&gt;add()&lt;/code&gt; is
+called, and &lt;code&gt;reset()&lt;/code&gt; is used to determine what the function does when it hits a new set of rows.&lt;/p&gt;
+
+&lt;p&gt;In the next article, I&amp;rsquo;ll take this new &lt;code&gt;PCORRELATION()&lt;/code&gt; function out for a spin on some vehicle data from the EPA.&lt;/p&gt;
+
+&lt;p&gt;(OK, yes, pun very much intended that time.)&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Managing variable type nullability</title>
+      <link>/kstirman.github.io/bookshelf/blog/managing-variable-type-nullability/</link>
+      <pubDate>Tue, 09 Feb 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/managing-variable-type-nullability/</guid>
+      <description>&lt;p&gt;One day you may find yourself with a custom function for Drill that&amp;rsquo;s very particular about the kind of variables that
+it accepts. In particular, it may hold strong opinions about whether or not a variable is allowed to express a &lt;code&gt;NULL&lt;/code&gt;
+value. In fact it may even be &lt;em&gt;you&lt;/em&gt; who wrote this unavoidably fussy function (SPOILER: This is exactly what happened to
+me earlier this week).&lt;/p&gt;
+
+&lt;p&gt;Currently Drill lacks built-in functions to add or strip nullability from variables, but luckily it&amp;rsquo;s very easy to whip
+up a couple UDFs which do exactly that. Today I&amp;rsquo;ll be showcasing two such functions which respectively add and remove
+nullability from Drill &lt;code&gt;FLOAT&lt;/code&gt; variables. As usual you should perform the necessary incantations and summoning rituals
+for creating a custom function project in Maven (see the section &amp;ldquo;Downloading Maven and starting a new project&amp;rdquo; in &lt;a href=&#34;http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/&#34;&gt;this
+article&lt;/a&gt; for a refresher).&lt;/p&gt;
+
+&lt;p&gt;Once you&amp;rsquo;re ready to start thinking about source code, the class associated with the function to add nullability looks
+like:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;package com.yourgroupidentifier.udf;
+
+import org.apache.drill.exec.expr.DrillSimpleFunc;
+import org.apache.drill.exec.expr.holders.NullableFloat8Holder;
+import org.apache.drill.exec.expr.holders.Float8Holder;
+
+import org.apache.drill.exec.expr.annotations.FunctionTemplate;
+import org.apache.drill.exec.expr.annotations.Output;
+import org.apache.drill.exec.expr.annotations.Param;
+
+@FunctionTemplate(
+        name = &amp;quot;add_null_float&amp;quot;,
+        scope = FunctionTemplate.FunctionScope.SIMPLE,
+        nulls = FunctionTemplate.NullHandling.INTERNAL
+)
+
+public class addNullFloat implements DrillSimpleFunc {
+
+    @Param
+    Float8Holder input;
+
+    @Output
+    NullableFloat8Holder output;
+
+    public void setup() {
+    }
+
+    public void eval() {
+        output.isSet = 1;
+        output.value = input.value;
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;while the one for removing nullability is as follows:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;package com.yourgroupidentifier.udf;
+
+import org.apache.drill.exec.expr.DrillSimpleFunc;
+import org.apache.drill.exec.expr.holders.NullableFloat8Holder;
+import org.apache.drill.exec.expr.holders.Float8Holder;
+
+import org.apache.drill.exec.expr.annotations.FunctionTemplate;
+import org.apache.drill.exec.expr.annotations.Output;
+import org.apache.drill.exec.expr.annotations.Param;
+
+@FunctionTemplate(
+        name = &amp;quot;remove_null_float&amp;quot;,
+        scope = FunctionTemplate.FunctionScope.SIMPLE,
+        nulls = FunctionTemplate.NullHandling.INTERNAL
+)
+
+public class removeNullFloat implements DrillSimpleFunc {
+
+    @Param
+    NullableFloat8Holder input;
+
+    @Output
+    Float8Holder output;
+
+    public void setup() {
+    }
+
+    public void eval() {
+        output.value = input.value;
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Remember back in &lt;a href=&#34;http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/&#34;&gt;this post&lt;/a&gt; when I
+thought I was presenting the simplest UDFs I&amp;rsquo;d ever seen demonstrated? Well, these guys are definitely setting a new
+world record. They&amp;rsquo;re just about the smallest custom functions you can code for Drill. But that doesn&amp;rsquo;t mean they&amp;rsquo;re not
+useful! &lt;code&gt;ADD_NULL_FLOAT()&lt;/code&gt; and &lt;code&gt;REMOVE_NULL_FLOAT()&lt;/code&gt; make valuable additions to a Drill power user&amp;rsquo;s toolbox, and I&amp;rsquo;ll
+be putting one of them to work in a post later this week.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Smartest and dumbest subreddits as judged by submission title readability</title>
+      <link>/kstirman.github.io/bookshelf/blog/smartest-and-dumbest-subreddits-as-judged-by-submission-title-readibility/</link>
+      <pubDate>Sat, 06 Feb 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/smartest-and-dumbest-subreddits-as-judged-by-submission-title-readibility/</guid>
+      <description>&lt;p&gt;Alright, time to put the readability UDF from &lt;a href=&#34;http://www.dremio.com/blog/querying-for-reading-level-with-a-simple-udf/&#34;&gt;my last
+post&lt;/a&gt; to work on some data! For today&amp;rsquo;s
+analysis, I&amp;rsquo;ll once again use this &lt;a href=&#34;https://www.reddit.com/r/datasets/comments/3mg812/full_reddit_submission_corpus_now_available_2006/&#34;&gt;Reddit submission
+corpus&lt;/a&gt;, which
+contains submission data from from the years 2006-2015.&lt;/p&gt;
+
+&lt;p&gt;The questions that motivate today&amp;rsquo;s analysis are simple, but fun: Which popular subreddits have the highest average
+submission title reading level? Which ones have the lowest? Or, more glibly, &amp;ldquo;Which subreddits are smart, and which are
+dumb?&amp;rdquo; My custom &lt;code&gt;READABILITY()&lt;/code&gt; function for Drill will help us settle this.&lt;/p&gt;
+
+&lt;p&gt;As usual when performing a slightly sophisticated analysis, I first shuffle the data through some VIEWs in order to
+grapple with it on my terms. In this case the prep work consisted of two VIEWs, which were constructed as follows:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW reddit_readability AS
+     SELECT title, READABILITY(title) ARI, subreddit
+       FROM hdfs.`/data/RS_full_corpus.json`
+      WHERE over_18 = &#39;false&#39;;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;which is in turn fed into:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW reddit AS
+     SELECT subreddit, COUNT(title) posts, AVG(ARI) `avg ARI`
+       FROM reddit_readability
+      GROUP BY subreddit;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;From here the query to ask for &amp;lsquo;smart&amp;rsquo; subreddits (as I&amp;rsquo;ve defined them) is easy:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT subreddit, posts, `avg ARI` FROM reddit WHERE posts &amp;gt; 100000 ORDER BY `avg ARI` DESC LIMIT 10;
++------------------------+---------+---------------------+
+|       subreddit        |  posts  |       avg ARI       |
++------------------------+---------+---------------------+
+| spam                   | 287305  | 15.658034632014635  |
+| longtail               | 134202  | 15.38567146310872   |
+| ModerationLog          | 356311  | 12.622485326455028  |
+| modlog                 | 266188  | 12.477493297559754  |
+| RisingThreads          | 142485  | 11.752936255500762  |
+| worldpolitics          | 163290  | 11.633828401867433  |
+| WritingPrompts         | 150776  | 11.348865875111446  |
+| environment            | 185858  | 11.167274719418218  |
+| Random_Acts_Of_Amazon  | 184420  | 11.14375363175314   |
+| conspiro               | 179705  | 10.868244970017907  |
++------------------------+---------+---------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;These results aren&amp;rsquo;t too surprising. Once the internal Reddit stuff is out of the way you&amp;rsquo;re left with some subjects
+that are pretty stereotypically high-minded: global politics, literary pursuits, and environmental issues. Also
+conspiracy theories, for some reason. That one&amp;rsquo;s weird.&lt;/p&gt;
+
+&lt;p&gt;Alright! On to the dumb stuff!&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT subreddit, posts, `avg ARI` FROM reddit WHERE posts &amp;gt; 100000 ORDER BY `avg ARI` LIMIT 10;
++-----------------------+----------+---------------------+
+|       subreddit       |  posts   |       avg ARI       |
++-----------------------+----------+---------------------+
+| me_irl                | 132477   | -6.597215524826628  |
+| itookapicture         | 226074   | 2.591935687626967   |
+| Fireteams             | 1600719  | 3.1183569978499373  |
+| amiugly               | 108643   | 3.135287171164027   |
+| Kikpals               | 170943   | 3.3521135496701313  |
+| offmychest            | 242639   | 3.794396824263522   |
+| Jokes                 | 163818   | 4.192728884240217   |
+| 4chan                 | 107196   | 4.337776062292176   |
+| GlobalOffensiveTrade  | 823488   | 4.346750167026149   |
+| reactiongifs          | 279156   | 4.464272224403798   |
++-----------------------+----------+---------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Yup. I can see why these subreddits are dumb. They might not be &lt;em&gt;bad&lt;/em&gt;, but they&amp;rsquo;re definitely not exactly intellectual. Instead it looks like they focus on funny stuff (jokes, Internet memes, gifs) and personal vanity.&lt;/p&gt;
+
+&lt;p&gt;I&amp;rsquo;d like to close on a more technical note that may help those of you looking to perform similar analyses: If you want
+to use a Drill UDF in a cluster setting, as I did here (a six-node HDFS configuration, for those curious) be sure to
+copy the relevant .jar files to the &lt;code&gt;jars/3rdparty&lt;/code&gt; directory of each machine&amp;rsquo;s Drill install. That&amp;rsquo;s all the setup required
+to start using the custom functions you&amp;rsquo;ve written on big data right away!&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Reddit hates George Bush more than Vladimir Putin</title>
+      <link>/kstirman.github.io/bookshelf/blog/reddit-hates-george-bush-more-than-vladimir-putin/</link>
+      <pubDate>Fri, 29 Jan 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/reddit-hates-george-bush-more-than-vladimir-putin/</guid>
+      <description>&lt;p&gt;Just as I promised, today I&amp;rsquo;m going to show off that nifty sentiment analysis UDF for Apache Drill that I discussed in
+&lt;a href=&#34;http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/&#34;&gt;the last article&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Today&amp;rsquo;s data is &lt;a href=&#34;http://www.dremio.com/blog/old-and-busted-teasing-formerly-fashionable-websites-from-reddit-data/&#34;&gt;once
+again&lt;/a&gt; provided by
+this &lt;a href=&#34;https://www.reddit.com/r/datasets/comments/3mg812/full_reddit_submission_corpus_now_available_2006/&#34;&gt;awesome dump of Reddit
+submissions&lt;/a&gt; that
+date from 2006 up through last summer. Basically I just ran the sentiment analyzer function through submission titles,
+examining a selection of politicians that I thought Reddit might feel strongly about.&lt;/p&gt;
+
+&lt;p&gt;In terms of nitty-gritty Drill stuff, I started by first making a view for the data that includes the sentiment score as
+computed by the star of yesterday&amp;rsquo;s post, the &lt;code&gt;SIMPLESENT()&lt;/code&gt; function:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; USE dfs.tmp;
+&amp;gt; CREATE VIEW testview AS SELECT LOWER(title) title, TO_TIMESTAMP(CAST(created_utc AS INT)) created, score, SIMPLESENT(title) sentiment FROM hdfs.`/data/RS_full_corpus.json`;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And from there I just computed a simple average of those scores over the entire corpus:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT AVG(sentiment) FROM testview WHERE title LIKE &#39;%donald trump%&#39;;
++------------------------+
+|         EXPR$0         |
++------------------------+
+| -0.052544239386344636  |
++------------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Remember negative scores indicate negative feelings, and likewise for positive scores. The somewhat surprising results
+are compiled below in Figure 1.&lt;/p&gt;
+
+&lt;p&gt;&lt;p style=&#34;text-align: center;&#34;&gt;
+&lt;img style=&#34;max-width: 100%;&#34; src=&#34;kstirman.github.io/bookshelf/img/reddit_politicians.png&#34;&gt;
+&lt;/p&gt;
+&lt;p style=&#34;text-align: center; font-style: italic;&#34;&gt;&lt;b&gt;Figure 1&lt;/b&gt;: Sentiment analysis for various politicians based on
+Reddit submission title.&lt;/p&gt;
+&lt;br&gt;
+&lt;br&gt;
+&lt;br&gt;
+&lt;br&gt;&lt;/p&gt;
+
+&lt;p&gt;So, yes, according to this sentiment analysis, Reddit definitely dislikes George Bush more than Vladimir Putin. I always
+think of Reddit as overall leaning a bit left in terms of politics, so it didn&amp;rsquo;t shock me to see Barack Obama and Bernie
+Sanders show up with positive values. However, it &lt;em&gt;did&lt;/em&gt; surprise me to see Hillary Clinton score negatively. And not
+only that, she scored even &lt;em&gt;more&lt;/em&gt; negatively than Sarah Palin!&lt;/p&gt;
+
+&lt;p&gt;Finally, those of us who were frequent redditors during the 2008 election season will be far from confused by the
+average sentiment score achieved by then nominal-Republican Ron Paul.&lt;/p&gt;
+
+&lt;p&gt;Reddit loves that guy.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Writing a custom SQL function for sentiment analysis</title>
+      <link>/kstirman.github.io/bookshelf/blog/writing-a-custom-SQL-function-for-sentiment-analysis/</link>
+      <pubDate>Thu, 28 Jan 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/writing-a-custom-SQL-function-for-sentiment-analysis/</guid>
+      <description>
+
+&lt;p&gt;In the world of data analytics a &amp;lsquo;sentiment analysis&amp;rsquo; is any technique that attempts to represent the feelings of users
+in a somewhat quantitative way. Implementations of this idea vary, but one of the simplest ones involves giving
+individual words a numeric score according to the strength of the positive or negative the emotions that they elicit.
+For instance we might assign a score of -2.3 to the word &amp;lsquo;disappointment&amp;rsquo; and a score of 1.8 to &amp;lsquo;lighthearted.&amp;rsquo;&lt;/p&gt;
+
+&lt;p&gt;In today&amp;rsquo;s article I&amp;rsquo;m going to demonstrate that writing a custom SQL function (also known as a user defined function,
+or UDF) that performs a sentiment analysis is a fairly straightforward task. The SQL platform we&amp;rsquo;ll be using for this
+project is Apache Drill; A software capable of querying &lt;em&gt;many&lt;/em&gt; different types of data stores that also allows for the
+creation of custom functions written in the Java programming language.&lt;/p&gt;
+
+&lt;p&gt;This isn&amp;rsquo;t the first time I&amp;rsquo;ve written about creating a UDF for Drill, and readers looking for a richer set of
+information about UDF programming may want to refer to &lt;a href=&#34;http://www.dremio.com/blog/querying-google-analytics-json-with-a-custom-sql-function/&#34;&gt;this earlier
+article&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h2 id=&#34;downloading-maven-and-starting-a-new-project&#34;&gt;Downloading Maven and starting a new project&lt;/h2&gt;
+
+&lt;p&gt;Just as before, we&amp;rsquo;ll want to start by downloading and installing Apache Maven (&lt;a href=&#34;https://maven.apache.org/download.cgi&#34;&gt;available
+here&lt;/a&gt;), which will be responsible for managing and building our Java project:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ tar xzvf apache-maven-3.3.9-bin.tar.gz
+$ mv apache-maven-3.3.9 apache-maven
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And since you&amp;rsquo;ll probably be using it fairly frequently it might be nice to put the Maven binary in the PATH environment
+variable, so add this line to your &lt;code&gt;.bashrc&lt;/code&gt; file:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;export PATH=$PATH:~/apache-maven/bin
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now go to whatever directory you&amp;rsquo;d like to store your UDFs in and issue this Maven command to create a new project for
+our sentiment analyzer called &amp;lsquo;simplesentiment&amp;rsquo;:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ mvn archetype:generate -DgroupId=com.dremio.app -DartifactId=simplesentiment -DinteractiveMode=false
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Because our UDF relies on Apache Drill, we&amp;rsquo;ll need to add a couple things to the project&amp;rsquo;s &lt;code&gt;pom.xml&lt;/code&gt; configuration file.
+The first should go within the &lt;code&gt;&amp;lt;dependencies&amp;gt;&lt;/code&gt; tag:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;lt;dependency&amp;gt;
+  &amp;lt;groupId&amp;gt;org.apache.drill.exec&amp;lt;/groupId&amp;gt;
+  &amp;lt;artifactId&amp;gt;drill-java-exec&amp;lt;/artifactId&amp;gt;
+  &amp;lt;version&amp;gt;1.4.0&amp;lt;/version&amp;gt;
+&amp;lt;/dependency&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;and the next should go inside the outermost tag called &lt;code&gt;&amp;lt;project&amp;gt;&lt;/code&gt;:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;lt;build&amp;gt;
+  &amp;lt;plugins&amp;gt;
+    &amp;lt;plugin&amp;gt;
+      &amp;lt;groupId&amp;gt;org.apache.maven.plugins&amp;lt;/groupId&amp;gt;
+      &amp;lt;artifactId&amp;gt;maven-source-plugin&amp;lt;/artifactId&amp;gt;
+      &amp;lt;version&amp;gt;2.4&amp;lt;/version&amp;gt;
+      &amp;lt;executions&amp;gt;
+        &amp;lt;execution&amp;gt;
+          &amp;lt;id&amp;gt;attach-sources&amp;lt;/id&amp;gt;
+          &amp;lt;phase&amp;gt;package&amp;lt;/phase&amp;gt;
+          &amp;lt;goals&amp;gt;
+            &amp;lt;goal&amp;gt;jar-no-fork&amp;lt;/goal&amp;gt;
+          &amp;lt;/goals&amp;gt;
+        &amp;lt;/execution&amp;gt;
+      &amp;lt;/executions&amp;gt;
+    &amp;lt;/plugin&amp;gt;
+  &amp;lt;/plugins&amp;gt;
+&amp;lt;/build&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Finally we need to make a &lt;code&gt;./src/main/resources/drill-module.conf&lt;/code&gt; file for the project (you&amp;rsquo;ll probably need to create
+the &amp;lsquo;resources&amp;rsquo; directory, so go ahead and do that). This file should have these contents:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;drill {
+  classpath.scanning {
+    packages : ${?drill.classpath.scanning.packages} [
+      com.yourgroupidentifier.udf
+    ]
+  }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Where &lt;code&gt;com.yourgroupidentifier.udf&lt;/code&gt; should be the same name as the &lt;code&gt;package&lt;/code&gt; specified in the Java files listed in the
+next section.&lt;/p&gt;
+
+&lt;h2 id=&#34;sentiment-analysis-udf-source-code&#34;&gt;Sentiment analysis UDF source code&lt;/h2&gt;
+
+&lt;p&gt;The sentiment analyzer in my UDF follows the simple algorithm that I described earlier, with the values for words
+provided by &lt;a href=&#34;https://github.com/cjhutto/vaderSentiment/blob/master/build/lib/vaderSentiment/vader_sentiment_lexicon.txt&#34;&gt;this
+file&lt;/a&gt;
+(&lt;code&gt;vader_sentiment_lexicon.txt&lt;/code&gt;) available on Github from user &amp;lsquo;cjhutto.&amp;rsquo;&lt;/p&gt;
+
+&lt;p&gt;Because Drill is picky about the format of a UDF class, this custom function had to be expressed in two different source
+files: one to define all the function&amp;rsquo;s operations, and another for a simple class to hold the dictionary that
+translates words to numeric sentiment values. For this project, these files will be located in the project&amp;rsquo;s
+&lt;code&gt;main/java/com/yourgroupidentifier/udf&lt;/code&gt; directory.&lt;/p&gt;
+
+&lt;p&gt;The first file, &lt;code&gt;simpleSent.java&lt;/code&gt; looks like:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;package com.yourgroupidentifier.udf;
+
+import org.apache.drill.exec.expr.DrillSimpleFunc;
+import org.apache.drill.exec.expr.holders.Float8Holder;
+import org.apache.drill.exec.expr.holders.NullableVarCharHolder;
+
+import org.apache.drill.exec.expr.annotations.FunctionTemplate;
+import org.apache.drill.exec.expr.annotations.Output;
+import org.apache.drill.exec.expr.annotations.Param;
+
+@FunctionTemplate(
+        name = &amp;quot;simplesent&amp;quot;,
+        scope = FunctionTemplate.FunctionScope.SIMPLE,
+        nulls = FunctionTemplate.NullHandling.NULL_IF_NULL
+)
+
+public class simpleSent implements DrillSimpleFunc {
+
+    // The input to the function---almost certainly a text field
+    @Param
+    NullableVarCharHolder input;
+
+    // The output of the function---just a number
+    @Output
+    Float8Holder out;
+
+    public void setup() {
+
+        // Initialize object that holds dictionary
+        new com.yourgroupidentifier.udf.dictHolder();
+
+        // Open the sentiment values file
+        try {
+            java.io.FileReader fileReader = new java.io.FileReader(&amp;quot;/path/to/vader_sentiment_lexicon.txt&amp;quot;);
+            java.io.BufferedReader bufferedReader = new java.io.BufferedReader(fileReader);
+
+            String currLine;
+
+            // Read each line
+            try {
+                while ((currLine = bufferedReader.readLine()) != null) {
+                    String[] splitLine = currLine.split(&amp;quot;\\s+&amp;quot;);
+
+                    String currWord = splitLine[0];
+                    Double currValue;
+                    try {
+                        currValue = Double.parseDouble(splitLine[1]);
+                    }
+                    catch (java.lang.NumberFormatException numberEx) {
+                        currValue = 0.0;
+                    }
+
+                    // Put sentiment value in dictionary
+                    com.yourgroupidentifier.udf.dictHolder.sentiDict.put(currWord, currValue);
+                }
+            }
+            catch(java.io.IOException ioEx) {
+                System.out.print(&amp;quot;IOException encountered&amp;quot;);
+            }
+
+        }
+        catch(java.io.FileNotFoundException fileEx) {
+            System.out.println(&amp;quot;Sentiment valences file not found!&amp;quot;);
+        }
+    }
+
+    public void eval() {
+
+        // Initialize output value
+        out.value = 0.0;
+
+        // Split up the input string
+        String inputString = org.apache.drill.exec.expr.fn.impl.StringFunctionHelpers.toStringFromUTF8(input.start, input.end, input.buffer);
+        String[] splitInputString = inputString.split(&amp;quot;\\s+&amp;quot;);
+
+        for(int i = 0; i &amp;lt; splitInputString.length; i++) {
+
+            java.lang.Object result = com.yourgroupidentifier.udf.dictHolder.sentiDict.get(splitInputString[i].toLowerCase());
+
+            if(result != null) {
+
+                Double wordValue = ((Double) result);
+
+                out.value += wordValue;
+            }
+        }
+
+    }
+
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;(Remember to change the line with &lt;code&gt;/path/to/vader_sentiment_lexicon.txt&lt;/code&gt; so that it reflects the location of the file on
+your system!)&lt;/p&gt;
+
+&lt;p&gt;The second file is called &lt;code&gt;dictHolder.java&lt;/code&gt;, and contains this small class:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;package com.yourgroupidentifier.udf;
+
+public class dictHolder {
+    static public java.util.Hashtable&amp;lt;String, Double&amp;gt; sentiDict;
+
+    public dictHolder() {
+        sentiDict = new java.util.Hashtable&amp;lt;String, Double&amp;gt;();
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;building-and-installing-our-udf&#34;&gt;Building and installing our UDF&lt;/h2&gt;
+
+&lt;p&gt;To build and install the custom function, just go to the project&amp;rsquo;s root directory (the one with &lt;code&gt;pom.xml&lt;/code&gt;) and issue
+these commands&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ mvn clean package
+$ cp target/*.jar ~/apache-drill/jars/3rdparty
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;changing the second command to be appropriate for your Drill install.&lt;/p&gt;
+
+&lt;p&gt;And that&amp;rsquo;s literally all there is to it! You should now be able to invoke the &lt;code&gt;SIMPLESENT()&lt;/code&gt; function from within
+Drill&amp;rsquo;s SQL prompt. In the next article I&amp;rsquo;ll be doing exactly that as I explore a corpus of Reddit submission titles
+using this handy new analysis tool.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

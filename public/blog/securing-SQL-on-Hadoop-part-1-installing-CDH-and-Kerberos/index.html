@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Securing SQL on Hadoop, Part 1: Installing CDH and Kerberos</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Securing SQL on Hadoop, Part 1: Installing CDH and Kerberos</h1>
+          <h4>by Nathan Griffith on 2016-01-22</h4>
+          
+
+<h2 id="introduction">Introduction</h2>
+
+<p>In the Dremio Blog we&rsquo;ve talked about pairing Drill with HDFS before, but never with the emphasis on security that so
+often comes hand-in-hand with enterprise applications. So today&rsquo;s post marks the beginning of a two part series
+explaining how to set up a cluster environment that enables <em>secure</em> SQL queries to data stored on HDFS. For this
+article&rsquo;s test &lsquo;hardware&rsquo; we&rsquo;ll use six instances provisioned from Amazon&rsquo;s EC2 service, while the core software
+components will be provided by Cloudera&rsquo;s Hadoop system, CDH, paired with Ubuntu 14.04. The &lsquo;secure&rsquo; element of this
+cluster environment with be enabled via Kerberos, which is an industry standard in the realm of authentication software.</p>
+
+<h2 id="step-1-cluster-set-up">Step 1.) Cluster Set Up</h2>
+
+<p>In general I&rsquo;ll be going into a significant amount of detail for this setup, since Kerberos configuration can be, well,
+<em>hard</em>. I am, however, going to assume right now that you know your way around the AWS Management Console, and can
+handle setting up a few instances and configuring them by yourself. Remember to select &lsquo;Ubuntu 14.04&rsquo; for the operating
+system, and make a security group for the cluster that opens all the the TCP and UDP ports between machines in the
+cluster, just to be sure they can communicate freely with eachother. You&rsquo;ll also want to open all ICMP ports (for ping),
+and TCP port 7180 for the Cloudera Manager software that we&rsquo;ll be using shortly. Things like system specs and storage
+are obviously somewhat up to you to decide on, but I went with fairly muscular &lsquo;m4.xlarge&rsquo; instances that had 250 GB of
+storage each (more than big enough for my Reddit submission corpus test data, which was featured in <a href="http://www.dremio.com/blog/old-and-busted-teasing-formerly-fashionable-websites-from-reddit-data/">this previous
+article</a>).</p>
+
+<h2 id="step-2-install-cdh-with-cloudera-manager">Step 2.) Install CDH with Cloudera Manager</h2>
+
+<p>We&rsquo;ll perform the install of CDH (and thus, our HDFS store) by using Cloudera&rsquo;s awesome Cloudera Manager software, which
+is <a href="http://www.cloudera.com/downloads/manager/5-5-1.html">available here</a>.</p>
+
+<p>After you download the .bin file from this site to one of the nodes on your cluster, mark it as executable and run it
+(from here on out I&rsquo;ll call the node that you selected for this step the &lsquo;Main Node&rsquo;).</p>
+
+<pre><code>$ chmod +x cloudera-manager-installer.bin
+$ sudo ./cloudera-manager-installer.bin
+</code></pre>
+
+<p>Once this software finishes running you can point a browser to the Main Node&rsquo;s URL (available from the AWS EC2 web
+interface) on port 7180. From here you can complete the install of CDH to rest of your cluster (the initial username and
+password are both &lsquo;admin&rsquo;). There are various options that show up as you progress through the steps, but for this
+simple example it&rsquo;s sufficient to accept the defaults for most cases. Just be sure to check the &ldquo;Install Oracle Java SE
+Development Kit&rdquo; and &ldquo;Install Java Unlimited Strength Encryption Policy Files&rdquo; boxes when they show up (this last one
+can be relevant to Kerberos encryption). You&rsquo;ll also need to specify the user &lsquo;ubuntu&rsquo; and the relevant private key
+&lsquo;.pem&rsquo; file for your cluster when you hit the &ldquo;Provide SSH login credentials&rdquo; screen. And the basic &ldquo;Core Hadoop&rdquo; option
+is fine when t comes to choosing what package set to install.</p>
+
+<p>That&rsquo;s really all there is to getting the Hadoop side of things running for this project. Shockingly easy, right?</p>
+
+<p>But now it&rsquo;s time for Kerberos. Sigh.</p>
+
+<h2 id="step-3a-install-and-configure-kerberos-main-node">Step 3a.) Install and Configure Kerberos: Main Node</h2>
+
+<p>Okay, it&rsquo;s not actually all that bad. All we have to do is install some packages on the cluster and do some small edits
+to conf files before we can hand it off to the Clouder Manager wizard for Kerberos configuration (let me say it again:
+Cloudera Manager is awesome).</p>
+
+<p>Let&rsquo;s begin with that needs to be done on the Main Node, which in the parlance of Kerberos will become the &lsquo;KDC&rsquo; (Key
+Distribution Center) of our authentication system. As per this <a href="https://help.ubuntu.com/community/Kerberos">Ubuntu
+documentation</a> (which was a useful reference for many of the following
+steps), go ahead and install these two packages</p>
+
+<pre><code>$ sudo apt-get install krb5-kdc krb5-admin-server
+</code></pre>
+
+<p>entering &ldquo;KEBEROS.CDH&rdquo; for the realm name in the first field that pops up, and specifying the Main Node&rsquo;s internal DNS
+name in the next two (again these can be found on the AWS EC2 instance page&mdash;they&rsquo;re formatted like
+&ldquo;ip-172.XXX.XXX.XXX.us-west-2.compute.internal&rdquo;). Then run</p>
+
+<pre><code>$ sudo dpkg-reconfigure krb5-kdc
+</code></pre>
+
+<p>and select &ldquo;Yes.&rdquo;</p>
+
+<p>Now it&rsquo;s time to edit the <code>/etc/krb5kdc/kdc.conf</code> file as recommended in <a href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_sg_s4_kerb_wizard.html">these Cloudera
+instructions</a>. Place the
+lines</p>
+
+<pre><code>max_life = 1d
+max_renewable_life = 7d
+kdc_tcp_ports = 88
+</code></pre>
+
+<p>in the KERBEROS.CDH &lsquo;[realms]&rsquo; entry, replacing any similar lines and deleting &lsquo;kdc_ports&rsquo; both there underneath
+&lsquo;[kdcdefaults].&rsquo; Alright! On to the next file.</p>
+
+<p>Create (or open) <code>/etc/krb5kdc/kadm5.acl</code>, and insert this line:</p>
+
+<pre><code>*/admin@KERBEROS.CDH    *
+</code></pre>
+
+<p>Now it&rsquo;s time to initialize the Kerberos realm with:</p>
+
+<pre><code>$ sudo krb5_newrealm
+</code></pre>
+
+<p>Cool. Now, we need to create the credentials that the Cloudera Manager wizard will use when it completes our Kerberos
+setup. To do this enter the command</p>
+
+<pre><code>$ sudo kadmin.local
+</code></pre>
+
+<p>and from within the prompt that&rsquo;s presented, type:</p>
+
+<pre><code>addprinc -pw &lt;PASSWORD&gt; cloudera-scm/admin@KERBEROS.CDH
+</code></pre>
+
+<p>Now hit Crtl-D to exit the prompt, and install one last package:</p>
+
+<pre><code>$ sudo apt-get install ldap-utils
+</code></pre>
+
+<h2 id="step-3b-install-and-configure-kerberos-other-nodes">Step 3b.) Install and Configure Kerberos: Other Nodes</h2>
+
+<p>Compared to the Main Node setup, this step is mercifully brief. For each other note in the cluster you just need to
+install this package:</p>
+
+<pre><code>$ sudo apt-get install krb5-user
+</code></pre>
+
+<p>When you&rsquo;re presented with the text fields this time you can just hit enter, because the wizard will end up handling
+this stuff for you in the end.</p>
+
+<h2 id="step-4-use-the-cloudera-manager-kerberos-wizard">Step 4.) Use the Cloudera Manager Kerberos wizard</h2>
+
+<p>To start the Kerberos wizard, select &ldquo;Enable Kerberos&rdquo; from the dropdown menu for the cluster (see Figure 1).</p>
+
+<p><br>
+<p style="text-align: center;">
+<img style="max-width: 100%;" src="/img/cloudera_kerberos.jpg">
+</p>
+<p style="text-align: center; font-style: italic;"><b>Figure 1</b>: Starting Cloudera Manager&rsquo;s Kerberos wizard.</p>
+<br></p>
+
+<p>First you&rsquo;re asked to check a bunch of boxes which are friendly reminders of all the prep work you need to do before the
+wizard can take over. We&rsquo;ve done all of this in the previous steps, so you can check away with wild abandon.</p>
+
+<p>On the next page put the AWS internal address for the Main Node in the field marked &ldquo;KDC Server Host&rdquo; and then
+&ldquo;KERBEROS.CDH&rdquo; for the realm name. Hit &ldquo;Continue&rdquo; and then check the &ldquo;Manage krb5.conf through Cloudera Manager&rdquo; box.
+The defaults here are fine.</p>
+
+<p>Now you need to enter the credentials that were set up in Step 3a. As per <a href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_sg_s3_cm_principal.html">this Cloudera
+doc</a> we made the account
+&lsquo;cloudera-scm/admin&rsquo;, so go ahead and put that username and whatever password you chose into this page.</p>
+
+<p>From here you can just hit &ldquo;Continue&rdquo; until you&rsquo;re presented with a &ldquo;Yes, I am ready to restart the cluster now&rdquo;
+checkbox. Check it, and (you guessed it!) hit &ldquo;Continue&rdquo; again. The wizard will now stop all the services and bring them
+back up with Kerberos authentication activated.</p>
+
+<p>That&rsquo;s it! You now have a Kerberos-secured CDH cluster!</p>
+
+<p>This is cool in itself, but in my next post we&rsquo;ll get to the real heart of the matter: Installing and configuring Apache
+Drill on this system so that we can perform the secure SQL queries that I advertized in the article title. Stay tuned!</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

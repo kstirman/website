@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/reddit/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/reddit/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Smartest and dumbest subreddits as judged by submission title readability</title>
+      <link>/kstirman.github.io/bookshelf/blog/smartest-and-dumbest-subreddits-as-judged-by-submission-title-readibility/</link>
+      <pubDate>Sat, 06 Feb 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/smartest-and-dumbest-subreddits-as-judged-by-submission-title-readibility/</guid>
+      <description>&lt;p&gt;Alright, time to put the readability UDF from &lt;a href=&#34;http://www.dremio.com/blog/querying-for-reading-level-with-a-simple-udf/&#34;&gt;my last
+post&lt;/a&gt; to work on some data! For today&amp;rsquo;s
+analysis, I&amp;rsquo;ll once again use this &lt;a href=&#34;https://www.reddit.com/r/datasets/comments/3mg812/full_reddit_submission_corpus_now_available_2006/&#34;&gt;Reddit submission
+corpus&lt;/a&gt;, which
+contains submission data from from the years 2006-2015.&lt;/p&gt;
+
+&lt;p&gt;The questions that motivate today&amp;rsquo;s analysis are simple, but fun: Which popular subreddits have the highest average
+submission title reading level? Which ones have the lowest? Or, more glibly, &amp;ldquo;Which subreddits are smart, and which are
+dumb?&amp;rdquo; My custom &lt;code&gt;READABILITY()&lt;/code&gt; function for Drill will help us settle this.&lt;/p&gt;
+
+&lt;p&gt;As usual when performing a slightly sophisticated analysis, I first shuffle the data through some VIEWs in order to
+grapple with it on my terms. In this case the prep work consisted of two VIEWs, which were constructed as follows:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW reddit_readability AS
+     SELECT title, READABILITY(title) ARI, subreddit
+       FROM hdfs.`/data/RS_full_corpus.json`
+      WHERE over_18 = &#39;false&#39;;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;which is in turn fed into:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW reddit AS
+     SELECT subreddit, COUNT(title) posts, AVG(ARI) `avg ARI`
+       FROM reddit_readability
+      GROUP BY subreddit;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;From here the query to ask for &amp;lsquo;smart&amp;rsquo; subreddits (as I&amp;rsquo;ve defined them) is easy:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT subreddit, posts, `avg ARI` FROM reddit WHERE posts &amp;gt; 100000 ORDER BY `avg ARI` DESC LIMIT 10;
++------------------------+---------+---------------------+
+|       subreddit        |  posts  |       avg ARI       |
++------------------------+---------+---------------------+
+| spam                   | 287305  | 15.658034632014635  |
+| longtail               | 134202  | 15.38567146310872   |
+| ModerationLog          | 356311  | 12.622485326455028  |
+| modlog                 | 266188  | 12.477493297559754  |
+| RisingThreads          | 142485  | 11.752936255500762  |
+| worldpolitics          | 163290  | 11.633828401867433  |
+| WritingPrompts         | 150776  | 11.348865875111446  |
+| environment            | 185858  | 11.167274719418218  |
+| Random_Acts_Of_Amazon  | 184420  | 11.14375363175314   |
+| conspiro               | 179705  | 10.868244970017907  |
++------------------------+---------+---------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;These results aren&amp;rsquo;t too surprising. Once the internal Reddit stuff is out of the way you&amp;rsquo;re left with some subjects
+that are pretty stereotypically high-minded: global politics, literary pursuits, and environmental issues. Also
+conspiracy theories, for some reason. That one&amp;rsquo;s weird.&lt;/p&gt;
+
+&lt;p&gt;Alright! On to the dumb stuff!&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT subreddit, posts, `avg ARI` FROM reddit WHERE posts &amp;gt; 100000 ORDER BY `avg ARI` LIMIT 10;
++-----------------------+----------+---------------------+
+|       subreddit       |  posts   |       avg ARI       |
++-----------------------+----------+---------------------+
+| me_irl                | 132477   | -6.597215524826628  |
+| itookapicture         | 226074   | 2.591935687626967   |
+| Fireteams             | 1600719  | 3.1183569978499373  |
+| amiugly               | 108643   | 3.135287171164027   |
+| Kikpals               | 170943   | 3.3521135496701313  |
+| offmychest            | 242639   | 3.794396824263522   |
+| Jokes                 | 163818   | 4.192728884240217   |
+| 4chan                 | 107196   | 4.337776062292176   |
+| GlobalOffensiveTrade  | 823488   | 4.346750167026149   |
+| reactiongifs          | 279156   | 4.464272224403798   |
++-----------------------+----------+---------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Yup. I can see why these subreddits are dumb. They might not be &lt;em&gt;bad&lt;/em&gt;, but they&amp;rsquo;re definitely not exactly intellectual. Instead it looks like they focus on funny stuff (jokes, Internet memes, gifs) and personal vanity.&lt;/p&gt;
+
+&lt;p&gt;I&amp;rsquo;d like to close on a more technical note that may help those of you looking to perform similar analyses: If you want
+to use a Drill UDF in a cluster setting, as I did here (a six-node HDFS configuration, for those curious) be sure to
+copy the relevant .jar files to the &lt;code&gt;jars/3rdparty&lt;/code&gt; directory of each machine&amp;rsquo;s Drill install. That&amp;rsquo;s all the setup required
+to start using the custom functions you&amp;rsquo;ve written on big data right away!&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Reddit hates George Bush more than Vladimir Putin</title>
+      <link>/kstirman.github.io/bookshelf/blog/reddit-hates-george-bush-more-than-vladimir-putin/</link>
+      <pubDate>Fri, 29 Jan 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/reddit-hates-george-bush-more-than-vladimir-putin/</guid>
+      <description>&lt;p&gt;Just as I promised, today I&amp;rsquo;m going to show off that nifty sentiment analysis UDF for Apache Drill that I discussed in
+&lt;a href=&#34;http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/&#34;&gt;the last article&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Today&amp;rsquo;s data is &lt;a href=&#34;http://www.dremio.com/blog/old-and-busted-teasing-formerly-fashionable-websites-from-reddit-data/&#34;&gt;once
+again&lt;/a&gt; provided by
+this &lt;a href=&#34;https://www.reddit.com/r/datasets/comments/3mg812/full_reddit_submission_corpus_now_available_2006/&#34;&gt;awesome dump of Reddit
+submissions&lt;/a&gt; that
+date from 2006 up through last summer. Basically I just ran the sentiment analyzer function through submission titles,
+examining a selection of politicians that I thought Reddit might feel strongly about.&lt;/p&gt;
+
+&lt;p&gt;In terms of nitty-gritty Drill stuff, I started by first making a view for the data that includes the sentiment score as
+computed by the star of yesterday&amp;rsquo;s post, the &lt;code&gt;SIMPLESENT()&lt;/code&gt; function:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; USE dfs.tmp;
+&amp;gt; CREATE VIEW testview AS SELECT LOWER(title) title, TO_TIMESTAMP(CAST(created_utc AS INT)) created, score, SIMPLESENT(title) sentiment FROM hdfs.`/data/RS_full_corpus.json`;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And from there I just computed a simple average of those scores over the entire corpus:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT AVG(sentiment) FROM testview WHERE title LIKE &#39;%donald trump%&#39;;
++------------------------+
+|         EXPR$0         |
++------------------------+
+| -0.052544239386344636  |
++------------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Remember negative scores indicate negative feelings, and likewise for positive scores. The somewhat surprising results
+are compiled below in Figure 1.&lt;/p&gt;
+
+&lt;p&gt;&lt;p style=&#34;text-align: center;&#34;&gt;
+&lt;img style=&#34;max-width: 100%;&#34; src=&#34;kstirman.github.io/bookshelf/img/reddit_politicians.png&#34;&gt;
+&lt;/p&gt;
+&lt;p style=&#34;text-align: center; font-style: italic;&#34;&gt;&lt;b&gt;Figure 1&lt;/b&gt;: Sentiment analysis for various politicians based on
+Reddit submission title.&lt;/p&gt;
+&lt;br&gt;
+&lt;br&gt;
+&lt;br&gt;
+&lt;br&gt;&lt;/p&gt;
+
+&lt;p&gt;So, yes, according to this sentiment analysis, Reddit definitely dislikes George Bush more than Vladimir Putin. I always
+think of Reddit as overall leaning a bit left in terms of politics, so it didn&amp;rsquo;t shock me to see Barack Obama and Bernie
+Sanders show up with positive values. However, it &lt;em&gt;did&lt;/em&gt; surprise me to see Hillary Clinton score negatively. And not
+only that, she scored even &lt;em&gt;more&lt;/em&gt; negatively than Sarah Palin!&lt;/p&gt;
+
+&lt;p&gt;Finally, those of us who were frequent redditors during the 2008 election season will be far from confused by the
+average sentiment score achieved by then nominal-Republican Ron Paul.&lt;/p&gt;
+
+&lt;p&gt;Reddit loves that guy.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Old and busted: Teasing formerly-fashionable websites from Reddit data</title>
+      <link>/kstirman.github.io/bookshelf/blog/old-and-busted-tesasing-formery-fashionable-websites-from-Reddit-data/</link>
+      <pubDate>Sun, 03 Jan 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/old-and-busted-tesasing-formery-fashionable-websites-from-Reddit-data/</guid>
+      <description>&lt;p&gt;Anyone who spends even a little bit of time on the Internet knows how fickle and volatile the cultural scene is. And
+there&amp;rsquo;s perhaps no greater exemplar of this volatility than Reddit. For good or bad, Reddit communities often serve as
+tastemakers for the Internet at large. If your content is visible on Reddit, chances are that things are going great for
+you. And if not, well, maybe not&amp;hellip;&lt;/p&gt;
+
+&lt;p&gt;The topic for today&amp;rsquo;s post is pretty simple&amp;mdash;I&amp;rsquo;m just going to show off a cool analysis related to this
+observation. The data set will be a &lt;a href=&#34;https://www.reddit.com/r/datasets/comments/3mg812/full_reddit_submission_corpus_now_available_2006/&#34;&gt;JSON dump of all Reddit
+submissions&lt;/a&gt; from
+2006 up through Summer 2015, which I&amp;rsquo;ll be analyzing for site URLs that &lt;em&gt;used&lt;/em&gt; to be popular but have recently fallen
+out of favor. The size of this dump was fairly formidable (about a quarter-terabyte uncompressed), so on the backend
+this analysis was facilitated by running Drill in a cluster configuration on a Hadoop filesystem. This kept the runtime
+of the somewhat sophisticated query I needed to perform down to well under an hour.&lt;/p&gt;
+
+&lt;p&gt;So how exactly does one go about determining which Reddit submission URLs are, technically speaking, &amp;ldquo;old and busted&amp;rdquo;?
+Well, I started off my analysis by constructing a view to keep track of the relevant parameters and convert them to the
+correct format and units. In my case I&amp;rsquo;m interested the number of times a URL shows up in a submission, the average
+posting date for each URL, and the standard deviation in submission dates (in units of days):&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW reddit AS SELECT domain, COUNT(domain) counts, TO_TIMESTAMP(avg(CAST(created_utc AS FLOAT))) avg_date, STDDEV(CAST(created_utc AS FLOAT))/86400 std_dev_days
+       FROM hdfs.`/data/RS_full_corpus.json`
+   GROUP BY domain;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;So now it becomes fairly easy to construct a query on top of this view that looks for websites with old average
+submission dates that also exhibit fairly strongly clustering (which I&amp;rsquo;ll define as an average submission date older
+than Jan. 1, 2011 with a standard deviation in submission dates of less than 600 days). These two in combination will
+define our &amp;ldquo;old and busted&amp;rdquo; criterion.&lt;/p&gt;
+
+&lt;p&gt;The query looks like this, and returns these results:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT * FROM reddit WHERE std_dev_days &amp;lt; 600 AND avg_date &amp;lt; &#39;2011-01-01 00:00:00&#39; ORDER BY counts DESC LIMIT 20;
++------------------------+---------+--------------------------+---------------------+
+|         domain         | counts  |         avg_date         |    std_dev_days     |
++------------------------+---------+--------------------------+---------------------+
+| self.reddit.com        | 647870  | 2010-09-02 13:56:28.448  | 301.71035168793304  |
+| examiner.com           | 151810  | 2010-12-16 23:26:30.526  | 585.7963478654447   |
+| news.bbc.co.uk         | 88227   | 2009-10-19 22:09:54.047  | 499.8828691832385   |
+| squidoo.com            | 68613   | 2010-02-15 05:45:45.863  | 457.7467960677672   |
+| hubpages.com           | 57290   | 2010-01-30 02:18:28.314  | 353.1463760830986   |
+| msnbc.msn.com          | 43643   | 2010-06-13 13:34:33.274  | 491.4442681051865   |
+| associatedcontent.com  | 24146   | 2009-08-18 17:40:57.408  | 403.1500022424656   |
+| tinyurl.com            | 24070   | 2010-08-28 15:11:38.083  | 471.1292710623187   |
+| self.programming       | 20689   | 2009-11-08 14:04:07.185  | 239.53706245104482  |
+| physorg.com            | 17431   | 2010-09-27 02:00:58.908  | 435.832257804899    |
+| ehow.com               | 16228   | 2009-09-19 05:58:19.334  | 524.9960557567199   |
+| gather.com             | 15387   | 2010-06-28 12:05:28.479  | 365.76299060306405  |
+| english.aljazeera.net  | 14573   | 2010-10-02 14:05:55.813  | 360.5432415872375   |
+| subimg.net             | 13459   | 2010-09-29 09:48:42.801  | 278.7920245425415   |
+| helium.com             | 13337   | 2009-09-28 16:38:56.651  | 441.641404727207    |
+| sports.espn.go.com     | 12416   | 2010-10-17 19:30:23.67   | 493.84151020454976  |
+| rapidsharelist.net     | 12128   | 2010-04-26 15:53:44.063  | 14.947036935681274  |
+| waronyou.com           | 12036   | 2009-04-13 17:51:18.434  | 184.16688348655214  |
+| timesonline.co.uk      | 11100   | 2009-05-09 01:23:30.756  | 288.42826940864705  |
+| open.salon.com         | 10727   | 2010-08-10 09:48:09.563  | 494.63567877466306  |
++------------------------+---------+--------------------------+---------------------+
+20 rows selected (2490.628 seconds)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Using this list as a starting point, I started to do a little digging (see Table 1) into why these sites are no longer
+popular. What I found is that there a lot of reasons a site may end up in this ignominious category&amp;mdash;anything from
+a shift in the Google search algorithm to a simple redirect to a new URL. Other explanations included acquisition, a
+collapsed business model, and an outright ban of the URL from Reddit by site administrators.&lt;/p&gt;
+
+&lt;p&gt;&lt;br&gt;
+&lt;p style=&#34;text-align: center;&#34;&gt;
+&lt;img style=&#34;max-width: 80%;&#34; src=&#34;kstirman.github.io/bookshelf/img/reddit_url_table.png&#34;&gt;
+&lt;/p&gt;
+&lt;p style=&#34;text-align: center; font-style: italic;&#34;&gt;&lt;b&gt;Table 1&lt;/b&gt;: A selection of formerly-fashionable websites
+submitted to Reddit, and the suspected reason for their fall from grace.&lt;/p&gt;
+&lt;br&gt;&lt;/p&gt;
+
+&lt;p&gt;This is pretty interesting stuff, right? I&amp;rsquo;m definitely looking forward to using Drill to hunt for even more trends in
+the Reddit submission data.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

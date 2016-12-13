@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Examining U.S. radio antenna locations with Tableau Desktop 9</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Examining U.S. radio antenna locations with Tableau Desktop 9</h1>
+          <h4>by Nathan Griffith on 2015-12-10</h4>
+          <p>For today&rsquo;s demo I&rsquo;m going to parse a data.gov file that contains U.S. radio tower locations into a cool map figure.
+I&rsquo;ll be using Apache Drill to handle reading in and manipulating the geographic coordinate fields in the file, and
+<a href="http://www.tableau.com/">Tableau Desktop 9</a> to provide an easy way to generate a map based on the data.</p>
+
+<p>Attaching Tableau to Drill data in Microsoft Windows is pretty easy. Assuming you already have Drill (see <a href="http://www.dremio.com/blog/installing-apache-drill-on-microsoft-windows/">this
+article</a>) and Tableau installed, you just need
+to download and install <a href="http://package.mapr.com/tools/MapR-ODBC/MapR_Drill/MapRDrill_odbc_v1.2.0.1000/">this ODBC
+driver</a> from MapR (choose the 64-bit
+.msi file). That&rsquo;s all you&rsquo;ll need to be able to follow along with this demo, so let&rsquo;s turn our attention back to the
+data.</p>
+
+<p>Go ahead and download the zipped antenna files located on <a href="https://catalog.data.gov/dataset/antenna-structure-registration-asr-fcc-2000">this
+site</a>. Once they&rsquo;re unzipped, rename the
+&lsquo;CO.dat&rsquo; file to &lsquo;CO.tbl&rsquo; (be sure to turn on &lsquo;File name extensions&rsquo; under &lsquo;View&rsquo;). This renaming tells Drill to use the
+pipe symbol &lsquo;|&rsquo; as a delimiter for columns in the file.</p>
+
+<p>So let&rsquo;s take a look at the data:</p>
+
+<pre><code>&gt; SELECT * FROM dfs.`C:\Path\To\r_tower\CO.tbl` LIMIT 10;
++-----------------------------------------------------------------------------------------------------------------------+
+|                                                        columns                                                        |
++-----------------------------------------------------------------------------------------------------------------------+
+| [&quot;CO&quot;,&quot;REG&quot;,&quot;A0925026&quot;,&quot;1293612&quot;,&quot;2693131&quot;,&quot;T&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;\r&quot;]                                 |
+| [&quot;CO&quot;,&quot;REG&quot;,&quot;A0971560&quot;,&quot;1295891&quot;,&quot;2695410&quot;,&quot;T&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;\r&quot;]                                 |
+| [&quot;CO&quot;,&quot;REG&quot;,&quot;A0977407&quot;,&quot;1296672&quot;,&quot;2696191&quot;,&quot;T&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;\r&quot;]                                 |
+| [&quot;CO&quot;,&quot;REG&quot;,&quot;A0980840&quot;,&quot;1297184&quot;,&quot;2696703&quot;,&quot;T&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;\r&quot;]                                 |
+| [&quot;CO&quot;,&quot;REG&quot;,&quot;A0000039&quot;,&quot;1000019&quot;,&quot;96973&quot;,&quot;T&quot;,&quot;41&quot;,&quot;9&quot;,&quot;58.0&quot;,&quot;N&quot;,&quot;148198.0&quot;,&quot;81&quot;,&quot;15&quot;,&quot;23.0&quot;,&quot;W&quot;,&quot;292523.0&quot;,&quot;&quot;,&quot;\r&quot;]  |
+| [&quot;CO&quot;,&quot;REG&quot;,&quot;A0000069&quot;,&quot;1000042&quot;,&quot;96980&quot;,&quot;T&quot;,&quot;32&quot;,&quot;40&quot;,&quot;31.0&quot;,&quot;N&quot;,&quot;117631.0&quot;,&quot;97&quot;,&quot;8&quot;,&quot;29.0&quot;,&quot;W&quot;,&quot;349709.0&quot;,&quot;&quot;,&quot;\r&quot;]  |
+| [&quot;CO&quot;,&quot;REG&quot;,&quot;A0000072&quot;,&quot;1000044&quot;,&quot;96982&quot;,&quot;T&quot;,&quot;32&quot;,&quot;53&quot;,&quot;2.0&quot;,&quot;N&quot;,&quot;118382.0&quot;,&quot;96&quot;,&quot;48&quot;,&quot;34.0&quot;,&quot;W&quot;,&quot;348514.0&quot;,&quot;&quot;,&quot;\r&quot;]  |
+| [&quot;CO&quot;,&quot;REG&quot;,&quot;A0000073&quot;,&quot;1000045&quot;,&quot;96983&quot;,&quot;T&quot;,&quot;32&quot;,&quot;57&quot;,&quot;6.0&quot;,&quot;N&quot;,&quot;118626.0&quot;,&quot;97&quot;,&quot;3&quot;,&quot;52.0&quot;,&quot;W&quot;,&quot;349432.0&quot;,&quot;&quot;,&quot;\r&quot;]   |
+| [&quot;CO&quot;,&quot;REG&quot;,&quot;A0000097&quot;,&quot;1000064&quot;,&quot;96988&quot;,&quot;T&quot;,&quot;33&quot;,&quot;36&quot;,&quot;0.0&quot;,&quot;N&quot;,&quot;120960.0&quot;,&quot;85&quot;,&quot;50&quot;,&quot;0.0&quot;,&quot;W&quot;,&quot;309000.0&quot;,&quot;&quot;,&quot;\r&quot;]   |
+| [&quot;CO&quot;,&quot;REG&quot;,&quot;A0000122&quot;,&quot;1000086&quot;,&quot;96991&quot;,&quot;T&quot;,&quot;25&quot;,&quot;51&quot;,&quot;59.0&quot;,&quot;N&quot;,&quot;93119.0&quot;,&quot;80&quot;,&quot;17&quot;,&quot;6.0&quot;,&quot;W&quot;,&quot;289026.0&quot;,&quot;&quot;,&quot;\r&quot;]   |
++-----------------------------------------------------------------------------------------------------------------------+
+</code></pre>
+
+<p>Looks like we have a couple quirks to do deal with: 1.) the latitude and longitude information is spread across several
+columns and represented in sexigesimal format (see <a href="https://en.wikipedia.org/wiki/Degree_(angle)#Subdivisions">this Wiki
+link</a>), and 2.) at least some geographic fields are blank, so
+we&rsquo;ll need to account for that when we process the file.</p>
+
+<p>After some thought (and trial and error), I came up with following &lsquo;antenna&rsquo; view to hold the geo data that we want to
+access from Tableau:</p>
+
+<pre><code>CREATE VIEW antennas AS
+     SELECT CAST(columns[6] AS FLOAT)+(CAST(columns[7] AS FLOAT)/60)+(CAST(columns[8] AS FLOAT)/3600) lat,
+            -1*(CAST(columns[11] AS FLOAT)+(CAST(columns[12] AS FLOAT)/60)+(CAST(columns[13] AS FLOAT)/3600)) long
+       FROM dfs.`C:\Path\To\r_tower\CO.tbl`
+      WHERE LENGTH(columns[6]) &gt; 0;
+</code></pre>
+
+<p><em>But please note:</em> Before you issue this command you should switch to a writable schema by entering:</p>
+
+<pre><code>USE dfs.tmp;
+</code></pre>
+
+<p>Now that the view is created, we can focus on connecting Tableau to Drill and loading in the data. With Drill still
+running in a Command Prompt window, launch Tableau and select &ldquo;More Servers&hellip;&rdquo; from the &ldquo;Connect&rdquo; panel on the
+left-hand side. Then click &ldquo;Other Databases (ODBC).&rdquo; In the dialog box that appears, select &ldquo;MapR ODBC Driver for Drill
+DSN&rdquo; next to the &ldquo;DSN&rdquo; radio button. Now click &ldquo;Connect&rdquo;, then &ldquo;OK&rdquo; in the new window that pops up, followed by &ldquo;OK&rdquo; in
+the original window.</p>
+
+<p>With the connection to Drill completed, we can start hunting for our data. Type &lsquo;dfs.tmp&rsquo; into the &lsquo;Schema&rsquo; dropdown on
+the left and then select it. Now do the same for the Table dropdown below it, but this time type in the name of our
+view, &ldquo;antennas.&rdquo; Now drag the &lsquo;antennas&rsquo; table that appears below into the big blank space that says &lsquo;Drag tables
+here.&rsquo; Now it&rsquo;s time to tell Tableau that &lsquo;Long&rsquo; entries are actually &lsquo;longitude,&rsquo; so click the hash symbol next to the
+label down below and select &ldquo;Longitude&rdquo; from the &ldquo;Geographic Role&rdquo; submenu. To begin making our map figure, click &ldquo;Sheet
+1&rdquo; in the lower left of the window.</p>
+
+<p>On this screen drag &ldquo;Lat&rdquo; from under &ldquo;Measures&rdquo; on the left to &ldquo;Rows&rdquo; up top, and then perform a similar operation for
+&ldquo;Long&rdquo; and &ldquo;Columns.&rdquo; Now hit the small down-arrow next to the newly created row and column entries of &lsquo;AVG(Lat)&rsquo; and
+&lsquo;AVG(Long),&rsquo; changing their types from &lsquo;Measure (Average)&rsquo; to &lsquo;Dimension.&rsquo; And that&rsquo;s it! You should now be looking at a
+map of antenna locations in the United States that you can zoom and pan.</p>
+
+<p><br>
+<br>
+<p style="text-align: center;">
+<img style="max-width: 100%;" src="/img/us_radio.png">
+</p>
+<p style="text-align: center; font-style: italic;">Locations of radio towers within the continental United States.</p>
+<br>
+<br></p>
+
+<p>Pretty neat! This plot definitely explains some of the issues I had with cell coverage last time I drove across the
+Western states.</p>
+
+<p>Even though this is a simple demo, you can really see how using Drill to process data and Tableau to visualize it plays
+to the strengths of both pieces of software. It&rsquo;s a potent combination, and one you should definitely look into using if
+you&rsquo;re doing analytic work.</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

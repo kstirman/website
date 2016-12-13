@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Setting up an SQL interface to a sharded MongoDB</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Setting up an SQL interface to a sharded MongoDB</h1>
+          <h4>by Nathan Griffith on 2015-12-02</h4>
+          <p>Salutations, data fans! Today I&rsquo;d like to demonstrate how to use Apache Drill to query a sharded MongoDB database
+running on a computer cluster.</p>
+
+<p>To begin with, I&rsquo;m going to assume you already know how to do a sharded Mongo setup (the <a href="https://docs.mongodb.org/manual/sharding/">official
+documentation</a> is very helpful), or you already have access to a system with
+a sharded MongoDB in place. With this out of the way, I can focus on the Drill setup.</p>
+
+<p>When running in a multiple machine environment, Drill can increase its efficiency for very large queries by coordinating
+between several instances of a service called a &lsquo;drillbit.&rsquo; To help track these instances we use a piece of software
+called <a href="https://zookeeper.apache.org/">Apache Zookeeper</a>. Once Zookeeper is installed, you should make a &lsquo;zoo.cfg&rsquo; file
+in its &lsquo;./conf&rsquo; directory. This simple one works fine for our purposes (create a &lsquo;dataDir&rsquo; as needed):</p>
+
+<pre><code>tickTime=2000
+dataDir=/home/cluster-user/zookeeper/data
+clientPort=2183
+</code></pre>
+
+<p>Next you should download and install Drill to each of the nodes in the cluster that you&rsquo;d like a drillbit to run on. For
+my setup I&rsquo;ve chosen to run a drillbit on each node that contains a MongoDB shard. This is a good idea because Drill
+considers the location of data stores when it performs queries. The ./conf/drill-override.conf file for each install
+should be edited to reflect the IP address and port of your Zookeeper. For instance, you could write:</p>
+
+<pre><code>drill.exec: {
+  cluster-id: &quot;drill-cluster-example&quot;,
+  zk.connect: &quot;172.31.0.0:2183&quot;
+}
+</code></pre>
+
+<p>Where the name &ldquo;drill-cluster-example&rdquo; is the same for each node.</p>
+
+<p>With this minor bit of configuration out of the way, all that&rsquo;s left is to start the software. First bring up the
+Zookeeper server with &lsquo;~/zookeeper/bin/zkServer.sh start&rsquo;, and then launch the drillbits by running
+&lsquo;~/apache-drill/bin/drillbit.sh start&rsquo; on each node.
+After you&rsquo;ve started everything, you can run &lsquo;drill-conf&rsquo; to bring you to an SQL prompt. If all is well, you
+should be able to run <code>SELECT * FROM sys.drillbits;</code> and see each drillbit on the cluster report in. For example on a
+three machine test cluster I saw the following:</p>
+
+<pre><code>&gt; select * from sys.drillbits;
++----------------------------------------------+------------+---------------+------------+----------+
+|                   hostname                   | user_port  | control_port  | data_port  | current  |
++----------------------------------------------+------------+---------------+------------+----------+
+| ip-172-31-41-122.us-west-2.compute.internal  | 31010      | 31011         | 31012      | false    |
+| ip-172-31-41-120.us-west-2.compute.internal  | 31010      | 31011         | 31012      | false    |
+| ip-172-31-41-121.us-west-2.compute.internal  | 31010      | 31011         | 31012      | true     |
++----------------------------------------------+------------+---------------+------------+----------+
+</code></pre>
+
+<p>Now all that&rsquo;s left is to activate the Drill interface to MongoDB. Open the Drill Web Console by visiting one of the
+nodes that&rsquo;s running a drillbit (use port 8047, just like before). From here click &ldquo;Enable&rdquo; next to the &ldquo;mongo&rdquo; plugin,
+and then hit &ldquo;Update.&rdquo; Now change &ldquo;localhost:27017&rdquo; in the &ldquo;connection&rdquo; field to correspond to the IP and port of the
+machine that runs your &lsquo;mongos&rsquo; process. If you have more than one &ldquo;mongos&rdquo; you can specify them all like this:</p>
+
+<pre><code>...
+  &quot;connection&quot;: &quot;mongodb://172.31.41.120:27017,172.31.41.121:27017,172.31.41.122:27017&quot;,
+...
+</code></pre>
+
+<p>And that&rsquo;s it! You&rsquo;re now all set to run SQL queries on your sharded MongoDB via Drill. For an example of how to
+interface with some complicated JSON-based data that&rsquo;s typical of MongoDB collections, check out <a href="http://www.dremio.com/blog/bless-this-mess-working-with-complicated-json-structure-in-sql/">this
+other</a> post.</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

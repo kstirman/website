@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Reddit hates George Bush more than Vladimir Putin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Reddit hates George Bush more than Vladimir Putin</h1>
+          <h4>by Nathan Griffith on 2016-01-29</h4>
+          <p>Just as I promised, today I&rsquo;m going to show off that nifty sentiment analysis UDF for Apache Drill that I discussed in
+<a href="http://www.dremio.com/blog/writing-a-custom-sql-function-for-sentiment-analysis/">the last article</a>.</p>
+
+<p>Today&rsquo;s data is <a href="http://www.dremio.com/blog/old-and-busted-teasing-formerly-fashionable-websites-from-reddit-data/">once
+again</a> provided by
+this <a href="https://www.reddit.com/r/datasets/comments/3mg812/full_reddit_submission_corpus_now_available_2006/">awesome dump of Reddit
+submissions</a> that
+date from 2006 up through last summer. Basically I just ran the sentiment analyzer function through submission titles,
+examining a selection of politicians that I thought Reddit might feel strongly about.</p>
+
+<p>In terms of nitty-gritty Drill stuff, I started by first making a view for the data that includes the sentiment score as
+computed by the star of yesterday&rsquo;s post, the <code>SIMPLESENT()</code> function:</p>
+
+<pre><code>&gt; USE dfs.tmp;
+&gt; CREATE VIEW testview AS SELECT LOWER(title) title, TO_TIMESTAMP(CAST(created_utc AS INT)) created, score, SIMPLESENT(title) sentiment FROM hdfs.`/data/RS_full_corpus.json`;
+</code></pre>
+
+<p>And from there I just computed a simple average of those scores over the entire corpus:</p>
+
+<pre><code>&gt; SELECT AVG(sentiment) FROM testview WHERE title LIKE '%donald trump%';
++------------------------+
+|         EXPR$0         |
++------------------------+
+| -0.052544239386344636  |
++------------------------+
+</code></pre>
+
+<p>Remember negative scores indicate negative feelings, and likewise for positive scores. The somewhat surprising results
+are compiled below in Figure 1.</p>
+
+<p><p style="text-align: center;">
+<img style="max-width: 100%;" src="/img/reddit_politicians.png">
+</p>
+<p style="text-align: center; font-style: italic;"><b>Figure 1</b>: Sentiment analysis for various politicians based on
+Reddit submission title.</p>
+<br>
+<br>
+<br>
+<br></p>
+
+<p>So, yes, according to this sentiment analysis, Reddit definitely dislikes George Bush more than Vladimir Putin. I always
+think of Reddit as overall leaning a bit left in terms of politics, so it didn&rsquo;t shock me to see Barack Obama and Bernie
+Sanders show up with positive values. However, it <em>did</em> surprise me to see Hillary Clinton score negatively. And not
+only that, she scored even <em>more</em> negatively than Sarah Palin!</p>
+
+<p>Finally, those of us who were frequent redditors during the 2008 election season will be far from confused by the
+average sentiment score achieved by then nominal-Republican Ron Paul.</p>
+
+<p>Reddit loves that guy.</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

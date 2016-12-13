@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/crime/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/crime/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>The case of the stolen candy hearts: Advanced date parsing in SQL</title>
+      <link>/kstirman.github.io/bookshelf/blog/the-case-of-the-stolen-candy-hearts-advanced-date-parsing-in-sql/</link>
+      <pubDate>Tue, 02 Feb 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/the-case-of-the-stolen-candy-hearts-advanced-date-parsing-in-sql/</guid>
+      <description>&lt;p&gt;The other day I had 12 years of &lt;a href=&#34;https://data.sfgov.org/Public-Safety/Map-Crime-Incidents-from-1-Jan-2003/gxxq-x39z&#34;&gt;San Francisco crime
+data&lt;/a&gt; loaded in Drill and I wanted
+to answer the following question: Which days from recent years have the highest incidences of crime?&lt;/p&gt;
+
+&lt;p&gt;As it turns out, this isn&amp;rsquo;t that difficult to accomplish, but it did add some new functions to my repertoire, so I
+thought I&amp;rsquo;d share the process with you.&lt;/p&gt;
+
+&lt;p&gt;Once I got a hold of the SF crime download, I renamed it to a file with a &amp;lsquo;.csvh&amp;rsquo; extension so I could address the data
+by the column name given in the header. And as we can see in this simple query of the data&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT Category, `Date`, `Time`, Address FROM dfs.`/path/to/sfcrime.csvh` LIMIT 5;
++------------------------------+-------------+--------+---------------------------+
+|           Category           |    Date     |  Time  |          Address          |
++------------------------------+-------------+--------+---------------------------+
+| VANDALISM                    | 01/14/2016  | 23:45  | 3600 Block of ALEMANY BL  |
+| ASSAULT                      | 01/14/2016  | 23:45  | 0 Block of DRUMM ST       |
+| OTHER OFFENSES               | 01/14/2016  | 23:29  | PALOU AV / LANE ST        |
+| DRIVING UNDER THE INFLUENCE  | 01/14/2016  | 23:29  | PALOU AV / LANE ST        |
+| OTHER OFFENSES               | 01/14/2016  | 23:00  | 100 Block of DAKOTA ST    |
++------------------------------+-------------+--------+---------------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;the column labeled &amp;lsquo;Date&amp;rsquo; follows the &amp;lsquo;MM/dd/yyy&amp;rsquo; format, so I&amp;rsquo;ll want to keep that in mind when I use the &lt;code&gt;TO_DATE()&lt;/code&gt;
+function to transform that entry from a string to a &lt;code&gt;DATE&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;But remember, the ultimate goal is to find out which days of a given year have the highest crime. To do this I&amp;rsquo;ll need
+to make use of the &lt;code&gt;EXTRACT()&lt;/code&gt; function to pull the month, day, and year number from my newly constructed &lt;code&gt;DATE&lt;/code&gt; types.
+This is the function that was new to me, but thankfully it&amp;rsquo;s very easy to understand. You just specify which component
+of the date you&amp;rsquo;d like to pull as part of the argument, as in:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;EXTRACT(day FROM myDate)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;I ended up converting the &amp;lsquo;Date&amp;rsquo; column and performing the necessary EXTRACTs at the same time in this view (remember to
+&lt;code&gt;USE dfs.tmp;&lt;/code&gt; before entering this command):&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW crimedays AS
+     SELECT EXTRACT(month FROM TO_DATE(`Date`,&#39;MM/dd/yyyy&#39;)) month_num, EXTRACT(day FROM TO_DATE(`Date`,&#39;MM/dd/yyyy&#39;)) day_num,
+            EXTRACT(year FROM TO_DATE(`Date`,&#39;MM/dd/yyyy&#39;)) year_num, IncidntNum id, Category type
+       FROM dfs.`/path/to/sfcrime.csvh`;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;So now all it takes is a query with two GROUP BYs on the month and day number to come up with a list of high crime days
+for a previous year. Let&amp;rsquo;s take a look at 2014:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;  SELECT month_num, day_num, year_num, COUNT(id) crimes
+    FROM crimedays
+   WHERE year_num = 2014
+GROUP BY month_num, day_num, year_num
+ORDER BY crimes DESC
+   LIMIT 5;
++------------+----------+-----------+---------+
+| month_num  | day_num  | year_num  | crimes  |
++------------+----------+-----------+---------+
+| 10         | 11       | 2014      | 521     |
+| 2          | 14       | 2014      | 514     |
+| 3          | 19       | 2014      | 513     |
+| 8          | 8        | 2014      | 511     |
+| 8          | 9        | 2014      | 509     |
++------------+----------+-----------+---------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Apparently February 14th was an especially high crime day that year. So this coming Valentine&amp;rsquo;s Day, don&amp;rsquo;t forget to buy
+your significant other something nice. But also maybe take some extra care making sure no one steals it before you can
+give it to them!&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

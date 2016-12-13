@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> The case of the stolen candy hearts: Advanced date parsing in SQL</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>The case of the stolen candy hearts: Advanced date parsing in SQL</h1>
+          <h4>by Nathan Griffith on 2016-02-02</h4>
+          <p>The other day I had 12 years of <a href="https://data.sfgov.org/Public-Safety/Map-Crime-Incidents-from-1-Jan-2003/gxxq-x39z">San Francisco crime
+data</a> loaded in Drill and I wanted
+to answer the following question: Which days from recent years have the highest incidences of crime?</p>
+
+<p>As it turns out, this isn&rsquo;t that difficult to accomplish, but it did add some new functions to my repertoire, so I
+thought I&rsquo;d share the process with you.</p>
+
+<p>Once I got a hold of the SF crime download, I renamed it to a file with a &lsquo;.csvh&rsquo; extension so I could address the data
+by the column name given in the header. And as we can see in this simple query of the data</p>
+
+<pre><code>&gt; SELECT Category, `Date`, `Time`, Address FROM dfs.`/path/to/sfcrime.csvh` LIMIT 5;
++------------------------------+-------------+--------+---------------------------+
+|           Category           |    Date     |  Time  |          Address          |
++------------------------------+-------------+--------+---------------------------+
+| VANDALISM                    | 01/14/2016  | 23:45  | 3600 Block of ALEMANY BL  |
+| ASSAULT                      | 01/14/2016  | 23:45  | 0 Block of DRUMM ST       |
+| OTHER OFFENSES               | 01/14/2016  | 23:29  | PALOU AV / LANE ST        |
+| DRIVING UNDER THE INFLUENCE  | 01/14/2016  | 23:29  | PALOU AV / LANE ST        |
+| OTHER OFFENSES               | 01/14/2016  | 23:00  | 100 Block of DAKOTA ST    |
++------------------------------+-------------+--------+---------------------------+
+</code></pre>
+
+<p>the column labeled &lsquo;Date&rsquo; follows the &lsquo;MM/dd/yyy&rsquo; format, so I&rsquo;ll want to keep that in mind when I use the <code>TO_DATE()</code>
+function to transform that entry from a string to a <code>DATE</code>.</p>
+
+<p>But remember, the ultimate goal is to find out which days of a given year have the highest crime. To do this I&rsquo;ll need
+to make use of the <code>EXTRACT()</code> function to pull the month, day, and year number from my newly constructed <code>DATE</code> types.
+This is the function that was new to me, but thankfully it&rsquo;s very easy to understand. You just specify which component
+of the date you&rsquo;d like to pull as part of the argument, as in:</p>
+
+<pre><code>EXTRACT(day FROM myDate)
+</code></pre>
+
+<p>I ended up converting the &lsquo;Date&rsquo; column and performing the necessary EXTRACTs at the same time in this view (remember to
+<code>USE dfs.tmp;</code> before entering this command):</p>
+
+<pre><code>CREATE VIEW crimedays AS
+     SELECT EXTRACT(month FROM TO_DATE(`Date`,'MM/dd/yyyy')) month_num, EXTRACT(day FROM TO_DATE(`Date`,'MM/dd/yyyy')) day_num,
+            EXTRACT(year FROM TO_DATE(`Date`,'MM/dd/yyyy')) year_num, IncidntNum id, Category type
+       FROM dfs.`/path/to/sfcrime.csvh`;
+</code></pre>
+
+<p>So now all it takes is a query with two GROUP BYs on the month and day number to come up with a list of high crime days
+for a previous year. Let&rsquo;s take a look at 2014:</p>
+
+<pre><code>  SELECT month_num, day_num, year_num, COUNT(id) crimes
+    FROM crimedays
+   WHERE year_num = 2014
+GROUP BY month_num, day_num, year_num
+ORDER BY crimes DESC
+   LIMIT 5;
++------------+----------+-----------+---------+
+| month_num  | day_num  | year_num  | crimes  |
++------------+----------+-----------+---------+
+| 10         | 11       | 2014      | 521     |
+| 2          | 14       | 2014      | 514     |
+| 3          | 19       | 2014      | 513     |
+| 8          | 8        | 2014      | 511     |
+| 8          | 9        | 2014      | 509     |
++------------+----------+-----------+---------+
+</code></pre>
+
+<p>Apparently February 14th was an especially high crime day that year. So this coming Valentine&rsquo;s Day, don&rsquo;t forget to buy
+your significant other something nice. But also maybe take some extra care making sure no one steals it before you can
+give it to them!</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

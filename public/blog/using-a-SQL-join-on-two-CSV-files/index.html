@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Using a SQL JOIN on two CSV files</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Using a SQL JOIN on two CSV files</h1>
+          <h4>by Nathan Griffith on 2016-01-19</h4>
+          <p>One of Drill&rsquo;s great strengths is its ability to unite sets of information found in different places. In today&rsquo;s article
+I&rsquo;ll provide a quick example of this functionality by showing you how to you use Drill to quickly improve the interface
+to some found data.</p>
+
+<p>We&rsquo;ll start with the interesting but strangely formatted business-centered census data that we used in the <a href="http://www.dremio.com/blog/converting-csv-file-data-to-kudu-storage/">last
+post</a> (available on
+<a href="https://www.census.gov/econ/cbp/download/">this site</a> as a 14.3 MB zip file). As you&rsquo;ll recall, our command to query
+the state, county, and industry codes, along with the number of establishments, yielded results in the following format:</p>
+
+<pre><code>+-----------+----------+---------+------+
+| fipstate  | fipscty  |  naics  | est  |
++-----------+----------+---------+------+
+| 55        | 107      | 321113  | 1    |
+| 48        | 185      | 51213/  | 1    |
+| 39        | 135      | 42491/  | 6    |
+| 04        | 027      | 4411//  | 30   |
+| 08        | 085      | 541870  | 1    |
+| 26        | 061      | 51----  | 17   |
+| 28        | 049      | 519///  | 3    |
+| 48        | 139      | 48849/  | 3    |
+| 22        | 073      | 4853//  | 3    |
+| 48        | 139      | 424910  | 10   |
++-----------+----------+---------+------+
+</code></pre>
+
+<p>It&rsquo;s great to have data with this level of granularity, but the FIPS codes that the file uses to identify the state and
+county are far from intuitive. Thankfully we can use Drill in combination with this <a href="https://github.com/hadley/data-counties/blob/master/county-fips.csv">lovely CSV
+file</a> from Github user &lsquo;hadley&rsquo; to make the data
+more user-friendly. (Remember to rename both files as &lsquo;.csvh&rsquo; so Drill knows to pick up the column names!)</p>
+
+<p>Because Drill effectively treats each file as a separate table, we can gain access to human readable state and county
+names by performing an SQL JOIN across the files.</p>
+
+<p>That handy file from Github has a format like</p>
+
+<pre><code>+-----------------------+--------+--------------+-------------+
+|        county         | state  | county_fips  | state_fips  |
++-----------------------+--------+--------------+-------------+
+| Aleutians East        | AK     | 13           | 2           |
+| Aleutians West        | AK     | 16           | 2           |
+| Anchorage             | AK     | 20           | 2           |
+| Bethel                | AK     | 50           | 2           |
+| Bristol Bay           | AK     | 60           | 2           |
+| Denali                | AK     | 68           | 2           |
+| Dillingham            | AK     | 70           | 2           |
+| Fairbanks North Star  | AK     | 90           | 2           |
+| Haines                | AK     | 100          | 2           |
+| Juneau                | AK     | 110          | 2           |
++-----------------------+--------+--------------+-------------+
+</code></pre>
+
+<p>so a simple query that brings state and county names to the census data using a JOIN is:</p>
+
+<pre><code>  SELECT t2.state, t2.county, SUM(CAST(t1.est AS INT)) `total establishments`
+    FROM dfs.`/path/to/cbp13co.csvh` t1
+    JOIN dfs.`/path/to/county-fips.csvh` t2
+      ON t1.fipstate = t2.state_fips
+     AND t1.fipscty = t2.county_fips
+GROUP BY t2.state, t2.county
+ORDER BY `total establishments`
+    DESC LIMIT 10;
+</code></pre>
+
+<p>Which, for the curious, produces the following output:</p>
+
+<pre><code>+--------+--------------+-----------------------+
+| state  |    county    | total establishments  |
++--------+--------------+-----------------------+
+| TX     | Harris       | 571756                |
+| TX     | Dallas       | 374670                |
+| NY     | Suffolk      | 291970                |
+| TX     | Tarrant      | 232484                |
+| MI     | Oakland      | 230154                |
+| GA     | Fulton       | 203028                |
+| MI     | Wayne        | 190806                |
+| NY     | Westchester  | 189820                |
+| TX     | Travis       | 186236                |
+| MO     | St. Louis    | 184326                |
++--------+--------------+-----------------------+
+</code></pre>
+
+<p>Cool! (And, no, I have no idea why Harris county, Texas is apparently the business capitol of the United States.)</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/parquet/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/parquet/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Tuning Parquet file performance</title>
+      <link>/kstirman.github.io/bookshelf/blog/tuning-Parquet-file-performance/</link>
+      <pubDate>Sun, 13 Dec 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/tuning-Parquet-file-performance/</guid>
+      <description>&lt;p&gt;Today I&amp;rsquo;d like to pursue a brief discussion about how changing the size of a Parquet file&amp;rsquo;s &amp;lsquo;row group&amp;rsquo; to match a file
+system&amp;rsquo;s block size can effect the efficiency of read and write performance. This tweak can be especially important on
+HDFS environments in which I/O is intrinsically tied to network operations. (Note: If you&amp;rsquo;d first like to learn about
+Parquet in a less &amp;lsquo;nuts and bolts&amp;rsquo; manner, let me recommend &lt;a href=&#34;http://www.dremio.com/blog/sql-and-parquet-a-simple-demo/&#34;&gt;this
+post&lt;/a&gt; in which I provide a simple demo of the format using
+Apache Drill).&lt;/p&gt;
+
+&lt;p&gt;To understand why the &amp;lsquo;row group&amp;rsquo; size matters, it might be useful to first understand what the heck a &amp;lsquo;row group&amp;rsquo; is.
+For this let&amp;rsquo;s refer to Figure 1, which is a simple illustration of the Parquet file format.&lt;/p&gt;
+
+&lt;p&gt;&lt;br&gt;
+&lt;br&gt;
+&lt;p style=&#34;text-align: center;&#34;&gt;
+&lt;img style=&#34;max-width: 100%;&#34; src=&#34;kstirman.github.io/bookshelf/img/parquet_block1.png&#34;&gt;
+&lt;/p&gt;
+&lt;p style=&#34;text-align: center; font-style: italic;&#34;&gt;Figure 1: The basic anatomy of a Parquet file. The left file contains
+one row group, while the right is comprised of several.&lt;/p&gt;
+&lt;br&gt;
+&lt;br&gt;&lt;/p&gt;
+
+&lt;p&gt;As you can see, a row group is a segment of the Parquet file that holds serialized (and compressed!) arrays of column
+entries. Since bigger row groups mean longer continuous arrays of column data (which is the whole point of Parquet!),
+bigger row groups are generally good news if you want faster Parquet file operations.&lt;/p&gt;
+
+&lt;p&gt;But how does the block size of the disk come into play? Let&amp;rsquo;s look at Figure 2, which explores three different Parquet
+storage scenarios for an HDFS file system. In Scenario A, very large Parquet files are stored using large row groups.
+The large row groups are good for executing efficient column-based manipulations, but the groups and files are prone to
+spanning multiple disk blocks, which risks latency by invoking I/O operations. In Scenario B, small files are stored
+using a single small row group. This mitigates the number of block crossings, but reduces the efficacy of Parquet&amp;rsquo;s
+columnar storage format.&lt;/p&gt;
+
+&lt;p&gt;&lt;br&gt;
+&lt;br&gt;
+&lt;p style=&#34;text-align: center;&#34;&gt;
+&lt;img style=&#34;max-width: 100%;&#34; src=&#34;kstirman.github.io/bookshelf/img/parquet_block2.png&#34;&gt;
+&lt;/p&gt;
+&lt;p style=&#34;text-align: center; font-style: italic;&#34;&gt;Figure 2: Three different Parquet storage scenarios for an HDFS file
+system.&lt;/p&gt;
+&lt;br&gt;
+&lt;br&gt;&lt;/p&gt;
+
+&lt;p&gt;An ideal situation is demonstrated in Scenario C, in which one large Parquet file with one large row group is stored in
+one large disk block. This minimizes I/O operations, while maximizing the length of the stored columns. The &lt;a href=&#34;https://parquet.apache.org/documentation/latest/&#34;&gt;official
+Parquet documentation&lt;/a&gt; recommends a disk block/row group/file size of
+512 to 1024 MB on HDFS.&lt;/p&gt;
+
+&lt;p&gt;In Apache Drill, you can change the row group size of the Parquet files it writes by using the &lt;code&gt;ALTER SYSTEM SET&lt;/code&gt;
+command on the &lt;code&gt;store.parquet.block-size&lt;/code&gt; variable. For instance to set a row group size of 1 GB, you would enter:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;ALTER SYSTEM SET `store.parquet.block-size` = 1073741824;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;(Note: larger block sizes will also require more memory to manage.)&lt;/p&gt;
+
+&lt;p&gt;Parquet and Drill are already extremely well integrated when it comes to data access and storage&amp;mdash;this tweak just
+enhances an already potent symbiosis!&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>SQL and Parquet: A simple demo</title>
+      <link>/kstirman.github.io/bookshelf/blog/SQL-and-Parquet-a-simple-demo/</link>
+      <pubDate>Tue, 01 Dec 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/SQL-and-Parquet-a-simple-demo/</guid>
+      <description>&lt;p&gt;For data wranglers wishing to store large amounts of text or numeric entries in an efficient fashion, the Apache Parquet
+file format makes for an obvious choice. As a storage medium, Parquet has two important benefits afforded by its
+columnar structure: 1.) Access to data columns can be made on an &amp;lsquo;as needed&amp;rsquo; basis, increasing the overall speed of
+queries, and 2.) Since all values in a column are serialized and compressed together, Parquet files take up much less
+room than similar plain text or row-wise compressed files.&lt;/p&gt;
+
+&lt;p&gt;In this article I&amp;rsquo;ll run through a simple SQL manipulation enabled by Apache Drill which results in the creation of data
+stored in Parquet format. Drill&amp;rsquo;s support for Parquet runs deep, and it&amp;rsquo;s the default storage format for files created
+as a result of a CTAS (CREATE TABLE&amp;hellip; AS) command.&lt;/p&gt;
+
+&lt;p&gt;We&amp;rsquo;ll start by downloading some parking data from the city of Aarhus, Denmark (available via &lt;a href=&#34;http://iot.ee.surrey.ac.uk:8080/datasets.html&#34;&gt;this
+site&lt;/a&gt;), renaming the file so that it has a &amp;lsquo;.csvh&amp;rsquo; extention (as per
+&lt;a href=&#34;http://www.dremio.com/blog/sql-queries-on-csv-files-with-column-headers/&#34;&gt;this article&lt;/a&gt;). Then we&amp;rsquo;ll start the Drill
+prompt with the usual incantation (&lt;code&gt;drill-embedded&lt;/code&gt; for single-machine or &lt;code&gt;drill-conf&lt;/code&gt; on a cluster) and do a simple
+&lt;code&gt;SELECT *&lt;/code&gt; to look at the data:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT * FROM dfs.`/path/to/aarhus_parking.csvh` LIMIT 10;
++---------------+--------------------------+------+--------------+----------------+----------------------+
+| vehiclecount  |        updatetime        | _id  | totalspaces  |   garagecode   |      streamtime      |
++---------------+--------------------------+------+--------------+----------------+----------------------+
+| 0             | 2014-05-22 09:09:04.145  | 1    | 65           | NORREPORT      | 2014-11-03 16:18:44  |
+| 0             | 2014-05-22 09:09:04.145  | 2    | 512          | SKOLEBAKKEN    | 2014-11-03 16:18:44  |
+| 869           | 2014-05-22 09:09:04.145  | 3    | 1240         | SCANDCENTER    | 2014-11-03 16:18:44  |
+| 22            | 2014-05-22 09:09:04.145  | 4    | 953          | BRUUNS         | 2014-11-03 16:18:44  |
+| 124           | 2014-05-22 09:09:04.145  | 5    | 130          | BUSGADEHUSET   | 2014-11-03 16:18:44  |
+| 106           | 2014-05-22 09:09:04.145  | 6    | 400          | MAGASIN        | 2014-11-03 16:18:44  |
+| 115           | 2014-05-22 09:09:04.145  | 7    | 210          | KALKVAERKSVEJ  | 2014-11-03 16:18:44  |
+| 233           | 2014-05-22 09:09:04.145  | 8    | 700          | SALLING        | 2014-11-03 16:18:44  |
+| 0             | 2014-05-22 09:39:01.803  | 9    | 65           | NORREPORT      | 2014-11-03 16:18:44  |
+| 0             | 2014-05-22 09:39:01.803  | 10   | 512          | SKOLEBAKKEN    | 2014-11-03 16:18:44  |
++---------------+--------------------------+------+--------------+----------------+----------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Before we save this table as a Parquet file, we need to switch to a writable workspace inside Drill. The command&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;USE dfs.tmp;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;will do the trick&amp;mdash;it tells Drill to write files to the system&amp;rsquo;s /tmp directory. With that done all we need to do
+is run a CTAS&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE TABLE parking AS SELECT * FROM dfs.`/path/to/aarhus_parking.csvh`;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;and then rename the resulting temporary file:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;mv /tmp/parking/0_0_0.parquet /path/to/parking.parquet
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now we can query the new Parquet file with:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;SELECT * FROM dfs.`/path/to/parking.parquet` LIMIT 10;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;which yields the same results as before. But what about file size? How does the compressed Parquet file compare to the
+original CSV? Pretty darn favorably, as it turns out:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ ls -lrth
+total 8488
+-rw-r--r--  1 user  staff   594K Nov 30 15:06 parking.parquet
+-rw-r-----@ 1 user  staff   3.6M Nov 30 15:07 aarhus_parking.csvh
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;In round numbers, it&amp;rsquo;s about 1/6th the size!&lt;/p&gt;
+
+&lt;p&gt;So that&amp;rsquo;s an extremely brief tour of how easily Drill interfaces with the Parquet file format. Since the two are an
+extremely popular combination, expect to see some more in-depth articles about using Drill with Parquet on the Dremio
+Blog in the near future.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

@@ -1,0 +1,180 @@
+# Page settings
+baseurl = "localhost:1313"
+title = "dremio | reimagining data analytics for the modern world"
+languageCode = "en-us"
+theme = "hugo-elate-theme"
+
+[params]
+
+  # Meta
+  author = ""
+  description = ""
+
+  # Navigation
+  [params.navigation]
+    brand = "dremio"
+    home = "home"
+    testimonials = "testimonials"
+    jobs = "jobs"
+    blog = "blog"
+    about = "about"
+    contact = "contact"
+
+    # You can add custom links before or after the default links
+    # Assign a weight to define the order
+
+    # prepended links
+    #[[menu.prepend]]
+    #  url = "http://gohugo.io"
+    #  name = "Hugo"
+    #  weight = 10
+
+    # postpended links
+    #[[menu.postpend]]
+    #  url = "http://gohugo.io"
+    #  name = "External link"
+    #  weight = 10
+
+  # Hero section
+  [params.hero]
+    title = "Reimagining data analytics."
+    subtitle = 'Dremio is in stealth, creating an entirely new approach to data analytics that prioritizes user experience, simplicity, and scalability. Let us know if you would like to <div id="contactus"><a href="#">get in touch.</a></div>'
+
+  # Intro section
+  # Available icons: http://simplelineicons.com/
+  [params.intro]
+
+  [[params.intro.item]]
+    title = "user experience"
+    description = "a great user experience that makes you more productive and let's you focus on what matters. get started in minutes."
+    url = "#"
+    button = "Get In Touch"
+    icon = "icon-emotsmile"
+    img = "img_7.jpg"
+
+  [[params.intro.item]]
+    title = "simplicity"
+    description = "dremio simplifies your data engineering, and builds on key open source foundations that make analytics easy."
+    url = "#"
+    button = "Click Me"
+    icon = "icon-magic-wand"
+    img = "img_8.jpg"
+
+  [[params.intro.item]]
+    title = "scalability"
+    description = "from spreadsheets to petabyte data sets, dremio delivers interactive speed, with the tools your analysts and data scientists love."
+    url = "http://localhost:1313/blog/introducing-apache-arrow-columnar-in-memory-analytics/"
+    button = "read more"
+    icon = "icon-layers"
+    img = "img_10.jpg"
+
+
+
+  [params.intro.video]
+    enable = true
+    title = "Built On Apache Arrow"
+    icon = "icon-play2"
+    url = "https://www.youtube.com/watch?v=Xo9CO0a0VJI"
+
+  # Testimonials section
+  [params.testimonials]
+    enable = true
+    title = "Testimonials"
+    description = 'We are collaborating with industry titans to create an entirely new approach to data analytics. Early feedback has been exceptional. Contact us to discuss joining our beta.'
+
+    [[params.testimonials.item]]
+      quote = "&ldquo;I have been waiting for this exact product for 15 years. What took you guys so long?&rdquo;"
+      person = 'System Architect, BI & Middleware <span class="subtext">World Class Healthcare Provider</span>'
+      img = "person1.jpg"
+      alt = "Person1"
+
+    [[params.testimonials.item]]
+      quote = "&ldquo;There are literally 10,000 people in our company will be so much happier using dremio.&rdquo;"
+      person = 'Division CTO <span class="subtext">Leading Global Automobile Manufacturer</span>'
+      img = "person2.jpg"
+      alt = "Person2"
+
+    [[params.testimonials.item]]
+      quote = "&ldquo;What you just showed us in a few minutes usually takes our teams 6-12 months. Simply amazing.&rdquo;"
+      person = 'Data Engineer <span class="subtext">Fortune 100 Retail Company</span>'
+      img = "person3.jpg"
+      alt = "Person3"
+
+  #Jobs section
+  [params.jobs]
+    enable = true
+    title = "Jobs"
+
+  # Blog section
+  [params.blog]
+    enable = true
+    title = "blog"
+
+  # About section
+  [params.about]
+    enable = true
+    title = "About"
+    description = 'Dremio’s founding team has been at the forefront of big data analytics for over a decade. We started dremio to shatter a 20 year old paradigm that holds virtually every company back. We have built an amazing team - <a href="/jobs/">join us!</a>'
+
+    [[params.about.item]]
+      name = "Tomer Shiran"
+      position = "CEO"
+      description = "Held product leadership roles at MapR, Microsoft, and IBM. Originally from Israel. Avid skier."
+      img = "tomer_bw.png"
+      alt = "Tomer Shiran"
+      social = [
+        ["icon-twitter", "https://twitter.com/tshiran"],
+        ["icon-facebook", "https://www.facebook.com/tshiran"],
+        ["icon-linkedin", "https://www.linkedin.com/in/tshiran"]
+      ]
+
+    [[params.about.item]]
+      name = "Jacques Nadeau"
+      position = "CTO"
+      description = "Creator and PMC Chair of Apache Arrow and Apache Drill. Ran the distributed systems team at MapR."
+      img = "jacques_bw.png"
+      alt = "Jacques Nadeau"
+      social = [
+        ["icon-github", "https://github.com/jacques-n"],
+        ["icon-twitter", "https://twitter.com/intjesus"],
+        ["icon-linkedin", "https://www.linkedin.com/in/jacquesnadeau"]
+      ]
+
+    [[params.about.item]]
+      name = "Julien Le Dem"
+      position = "Principal Architect"
+      description = "Creator and PMC Chair of Apache Parquet. Formerly led Twitter's data analytics pipeline."
+      img = "julien_bw.png"
+      alt = "Julien Le Dem"
+      social = [
+        ["icon-github", "https://github.com/julienledem"],
+        ["icon-twitter", "https://twitter.com/J_"],
+        ["icon-linkedin", "https://www.linkedin.com/in/julienledem"]
+      ]
+
+
+  # Contact section
+  [params.contact]
+    enable = true
+    map = true
+    title = "Get in touch"
+    description = "We'd love to tell you more about dremio – contact us now."
+
+    # Available icons: http://simplelineicons.com/
+    details = [
+        ["icon-home", "883 N Shoreline Boulevard C100 <br> Mountain View, CA 94043"],
+        ["icon-phone", "+1.650.691.8642"],
+        ["icon-envelope", "contact@dremio.com"],
+        ["icon-globe", '<a href="http://www.dremio.com" target="_blank">dremio.com</a>']
+      ]
+
+    name = "Name"
+    email = "Email"
+    phone = "Phone"
+    message = "Message"
+    button = "Send message"
+
+  # Footer section
+  [params.footer]
+    enable = true
+    copyright = 'Copyright &copy; Dremio Corporation. All Rights Reserved. Site theme from FreeHTML5.co'

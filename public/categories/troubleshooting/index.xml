@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/troubleshooting/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/troubleshooting/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Finding corrupt JSON records in MongoDB</title>
+      <link>/kstirman.github.io/bookshelf/blog/finding-corrupt-JSON-records-in-MongoDB/</link>
+      <pubDate>Mon, 30 Nov 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/finding-corrupt-JSON-records-in-MongoDB/</guid>
+      <description>&lt;p&gt;A few weeks ago I mangled a MongoDB collection I was working with by importing a file I&amp;rsquo;d corrupted with a manual edit.
+The change I introduced was small, but serious enough to cause my Drill queries to fail. In this post I&amp;rsquo;m going to
+simulate this situation with an intentionally besmirched JSON file imported into MongoDB.&lt;/p&gt;
+
+&lt;p&gt;Today&amp;rsquo;s data set comes from some tweets that I pulled from Twitter&amp;rsquo;s streaming API. So let&amp;rsquo;s try to use Drill to query
+for some tweet id&amp;rsquo;s:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT id FROM mongo.tweets.small;
+Error: SYSTEM ERROR: IllegalArgumentException: You tried to write a VarChar type when you are using a ValueWriter of
+type NullableBigIntWriterImpl.
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Annnnd: No luck!&lt;/p&gt;
+
+&lt;p&gt;But can I at least look at the first 10 values?&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT id FROM mongo.tweets.small LIMIT 10;
+Error: SYSTEM ERROR: IllegalArgumentException: You tried to write a VarChar type when you are using a ValueWriter of
+type NullableBigIntWriterImpl.
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Still nothing. But let&amp;rsquo;s take a close look at the error message&amp;mdash;it looks like Drill is upset about about variable
+types. This is a good time to switch on Drill&amp;rsquo;s &lt;code&gt;union_type&lt;/code&gt; functionality, which will allow us to query a column that
+has multiple types of data.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; ALTER SYSTEM SET `exec.enable_union_type` = true;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now let&amp;rsquo;s ask for the &amp;lsquo;tweet id&amp;rsquo; value again, and this time tack on a column that tells us the type of the variable.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT id, TYPEOF(id) type FROM mongo.tweets.small LIMIT 10;
++---------------------+---------+
+|         id          |  type   |
++---------------------+---------+
+| 663858171623030785  | BIGINT  |
+| 663858171635589120  | BIGINT  |
+| 663858171627245572  | BIGINT  |
+| 663858171631374336  | BIGINT  |
+| 663858171631415296  | BIGINT  |
+| 663858171648184320  | BIGINT  |
+| 663858171635625984  | BIGINT  |
+| 663858171623043072  | BIGINT  |
+| 663858171618791424  | BIGINT  |
+| 663858171627175936  | BIGINT  |
++---------------------+---------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Looks like &amp;lsquo;BIGINT&amp;rsquo; is the standard type for the &amp;lsquo;id&amp;rsquo; values. So is there any case in which the type is &lt;em&gt;not&lt;/em&gt; equal to
+&amp;lsquo;BIGINT&amp;rsquo;? Let&amp;rsquo;s use this query:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT id, TYPEOF(id) type FROM mongo.tweets.small WHERE TYPEOF(id) NOT LIKE &#39;BIGINT&#39;;
++---------------------+----------+
+|         id          |   type   |
++---------------------+----------+
+| 663858171627352065  | VARCHAR  |
++---------------------+----------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Gotcha! I now have the offending tweet id in hand, so if I want to I can go back and fix the JSON file I imported. (In
+this case I had put quotes around the value, which caused it to read in as a string and not a number. Removing those
+quotes will do the trick and make the file read correctly.)&lt;/p&gt;
+
+&lt;p&gt;This makes for a fairly quick and easy way to hunt down issues in corrupted databases. Try it out next time you find
+yourself struggling with something that looks like a type error.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

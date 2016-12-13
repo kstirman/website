@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/physics/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/physics/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>What can LIGO see? Let&#39;s look at gravitational waves with SQL</title>
+      <link>/kstirman.github.io/bookshelf/blog/what-can-ligo-see-lets-look-at-gravitational-waves-with-sql/</link>
+      <pubDate>Thu, 11 Feb 2016 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/what-can-ligo-see-lets-look-at-gravitational-waves-with-sql/</guid>
+      <description>&lt;script type=&#34;text/javascript&#34;
+ src=&#34;http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML&#34;&gt;
+&lt;/script&gt;
+
+&lt;p&gt;It&amp;rsquo;s difficult to overstate how thrilling today&amp;rsquo;s news about gravity waves is. The scientific community has been waiting
+a &lt;em&gt;long&lt;/em&gt; time for this, and verification of the phenomenon has wide reaching implications in the fields of both
+astrophysics and particle physics. Gravity is, after all, the biggest thorn in the side of modern theoretical particle
+physics.&lt;/p&gt;
+
+&lt;p&gt;From a particle-centric standpoint gravity wave detection is identical to &amp;lsquo;graviton&amp;rsquo; detection. This is important
+because gravitons amount to the &amp;lsquo;missing link&amp;rsquo; between the currently disconnected realms of the very big (dictated by
+Einstein&amp;rsquo;s general relativity) and the very small (governed by quantum mechanics). The observation of gravitational
+waves may help to constrain the current multitude of competing quantum gravity theories, leading us closer what&amp;rsquo;s
+frequently called the Holy Grail of physics: a Theory of Everything.&lt;/p&gt;
+
+&lt;p&gt;Because the LIGO gravitational wave observatory is awesome, they&amp;rsquo;ve made some of the data relevant to their gravity wave
+event public (go check out &lt;a href=&#34;https://losc.ligo.org/events/GW150914/&#34;&gt;this site&lt;/a&gt;). As you may have guessed, I&amp;rsquo;m going to
+use &lt;a href=&#34;https://drill.apache.org/docs/drill-in-10-minutes/&#34;&gt;Apache Drill&lt;/a&gt; to say something about the data! In particular
+I&amp;rsquo;ll be investigating just how sensitive their equipment is, and what else they may be able to detect.&lt;/p&gt;
+
+&lt;p&gt;To do this analysis, I&amp;rsquo;ll be looking at the data for the &amp;lsquo;H1&amp;rsquo; LIGO detector shown in the leftmost plots of the top and
+third rows of &lt;a href=&#34;https://losc.ligo.org/events/GW150914/&#34;&gt;Figure 1&lt;/a&gt;. These files are called &lt;code&gt;fig1-observed-H.txt&lt;/code&gt; and
+&lt;code&gt;fig1-residual-H.txt&lt;/code&gt;, and they contain the signal-with-background and background-only time series data. To use these
+with Drill, open them up and remove the first line of the file, which is a comment. Then go edit the &amp;lsquo;dfs&amp;rsquo; plugin JSON
+(go to &lt;a href=&#34;http://localhost:8047/storage/dfs&#34;&gt;http://localhost:8047/storage/dfs&lt;/a&gt; after starting &lt;code&gt;drill-embdedded&lt;/code&gt;) so that you have an entry in &lt;code&gt;&amp;quot;formats&amp;quot;&lt;/code&gt; that
+looks like:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;    &amp;quot;txt&amp;quot;: {
+      &amp;quot;type&amp;quot;: &amp;quot;text&amp;quot;,
+      &amp;quot;extensions&amp;quot;: [
+        &amp;quot;txt&amp;quot;
+      ],
+      &amp;quot;delimiter&amp;quot;: &amp;quot; &amp;quot;
+    },
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;This ensures that Drill knows that to do with a file that ends in &amp;lsquo;.txt&amp;rsquo;, instructing it to treat spaces as the column
+delimiter. With this done, let&amp;rsquo;s write a SQL query to find the standard deviation of the background noise:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT STDDEV(CAST(columns[1] AS FLOAT)) FROM dfs.`/path/to/fig1-residual-H.txt`;
++----------------------+
+|        EXPR$0        |
++----------------------+
+| 0.16534411608717056  |
++----------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;So now let&amp;rsquo;s ask: On average, how many standard deviations away from the noise are the 100 biggest signal data points?
+First, we&amp;rsquo;ll make a view (remember &lt;code&gt;USE dfs.tmp;&lt;/code&gt;):&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW bigsignal AS
+     SELECT ABS(CAST(columns[1] AS FLOAT)/0.165) signal
+       FROM dfs.`/Users/ngriffith/Downloads/LIGO/fig1-observed-H.txt`
+   ORDER BY signal DESC
+      LIMIT 100;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;and then we can take the average:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT AVG(signal) FROM bigsignal;
++--------------------+
+|       EXPR$0       |
++--------------------+
+| 5.884780800703798  |
++--------------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Not too far off from the event significance given in &lt;a href=&#34;https://dcc.ligo.org/P150914/public&#34;&gt;the paper&lt;/a&gt; of 5.3 sigma!
+(Although their methodology is admittedly wildly different as well as much more rigorous and subtle.)&lt;/p&gt;
+
+&lt;p&gt;But what exactly &lt;em&gt;is&lt;/em&gt; this signal? Well a LIGO detector works by precisely measuring two identical kilometer-scale
+distances with lasers. The measured distances are are arranged in a cross-pattern, so that any passing gravitational
+waves will cause these lengths to contract or expand relative to one another by different (&lt;em&gt;very tiny!&lt;/em&gt;) amounts. The
+&amp;lsquo;signal&amp;rsquo; numbers that we&amp;rsquo;ve been looking at are the differences between these two lengths. One source of gravity waves
+(and the one that the people who run LIGO indicate in their announcement) is two massive bodies, such as black holes,
+orbiting one another.&lt;/p&gt;
+
+&lt;p&gt;Now let&amp;rsquo;s have a little more fun. The length difference from the data should be directly proportional to the amplitude
+\( A \) of the gravity wave, which in this situation expresses the proportionality (&lt;a href=&#34;https://en.wikipedia.org/wiki/Gravitational_wave#Power_radiated_by_orbiting_bodies&#34;&gt;according to
+Wikipedia&lt;/a&gt;) of:&lt;/p&gt;
+
+&lt;p&gt;$$ A \propto  \frac{m_1 m_2}{R} $$&lt;/p&gt;
+
+&lt;p&gt;where \( m_1 \) and \( m_2 \) are the masses of the orbiting bodies, and \( R \) is the distance of the observer
+from the center of mass of the two-body system.&lt;/p&gt;
+
+&lt;p&gt;Decreasing the observed signal waveform of about 5.88 sigma by half would leave itself us comfortably near 3 sigma
+territory, which is still a very strong indicator for significance (randomly achieving 3 sigma result is about a
+one-in-ten-thousand event). Admittedly from a visual standpoint this wouldn&amp;rsquo;t leave a very strong looking signal, but
+statistical analysis in conjunction with confirmation from another type of observatory (such as one looking at radio or
+gamma rays) may yield useful astrophysical data.&lt;/p&gt;
+
+&lt;p&gt;In the discovery paper the authors list two colliding black holes with similar masses (around 30 times the Sun) as a
+likely source of the event that they observed. They also place the event at a distance of about 1.2 billion light-years
+from Earth. If we can manage to notice gravity wave signals with half the strength, then LIGO would be able to detect
+similar events twice as far away, or with 71% the constituent mass.&lt;/p&gt;
+
+&lt;p&gt;The gravitational wave astronomy revolution has just started, and I&amp;rsquo;m extremely excited to see where it leads us!&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

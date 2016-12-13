@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+
+
+
+
+<html>
+    <head>
+            <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title> Introducing Apache Arrow: Columnar In-Memory Analytics</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="dremio is reimagining data analytics for the modern world" />
+    <meta name="keywords" content="analytics, apache arrow, apache drill, apache parquet" />
+
+    
+    <meta property="og:title" content="dremio | reimagining data analytics for the modern world"/>
+    <meta property="og:image" content=""/>
+    <meta property="og:url" content="http://www.dremio.com"/>
+    <meta property="og:site_name" content="dremio"/>
+    <meta property="og:description" content=""/>
+    <meta name="twitter:title" content="dremio | reimagining data analytics for the modern world" />
+    <meta name="twitter:image" content="" />
+    <meta name="twitter:url" content="http://www.dremio.com" />
+    <meta name="twitter:card" content="" />
+
+    
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,400italic,700' rel='stylesheet' type='text/css'>
+
+    
+    <link rel="stylesheet" href="/css/animate.css">
+    
+    <link rel="stylesheet" href="/css/icomoon.css">
+    
+    <link rel="stylesheet" href="/css/simple-line-icons.css">
+    
+    <link rel="stylesheet" href="/css/magnific-popup.css">
+    
+    <link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+    <link rel="stylesheet" href="/css/style.css">
+
+    
+    <script src="/js/modernizr-2.6.2.min.js"></script>
+    
+    
+
+    </head>
+    <body>
+
+          <header role="banner" id="fh5co-header" class="navbar-fixed-top fh5co-animated slideInDown">
+        <div class="container">
+            
+            <nav class="navbar navbar-default">
+                <div class="navbar-header">
+                    
+                    <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                    <a class="navbar-brand" href="index.html">dremio</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                  <ul class="nav navbar-nav navbar-right">
+
+                    
+
+                    <li class="active"><a href="#" data-nav-section="home"><span>home</span></a></li>
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="testimonials"><span>testimonials</span></a></li>
+                    
+
+                    
+
+                    
+                    <li><a href="#" data-nav-section="about"><span>about</span></a></li>
+                    
+
+                    
+                    <li><a href="#" data-nav-section="contact"><span>contact</span></a></li>
+                    
+
+                    
+                </ul>
+            </div>
+        </nav>
+        
+    </div>
+</header>
+
+      <br/>
+      <br/>
+      <br/>
+      <div class="container">
+        <div class="overlay"></div>
+        <div class="fh5co-text">
+          <h1>Introducing Apache Arrow: Columnar In-Memory Analytics</h1>
+          <h4>by Nathan Griffith on 2016-02-17</h4>
+          
+
+<p>Apache Arrow establishes a de-facto standard for columnar in-memory analytics which will redefine the performance and
+interoperability of most Big Data technologies. The lead developers of 13 major open source Big Data projects have
+joined forces to create Arrow, and additional companies and projects are expected to adopt and leverage the technology
+in the coming months. Within the next few years, I expect the vast majority of all new data in the world to move through
+Arrow’s columnar in-memory layer.</p>
+
+<h3 id="columnar-in-memory-complex-analytics">Columnar in-memory complex analytics</h3>
+
+<p>Arrow grew out of three prevailing trends and business requirements:</p>
+
+<ul>
+<li><strong>Columnar</strong>: Big Data has gone columnar. Led by the creation and adoption of Apache Parquet and other columnar data storage
+technologies, the industry has experienced rapid adoption of columnar storage for analytical workloads. These formats
+reduce the footprint and increase the performance of such workloads.</li>
+<li><strong>In-memory</strong>: In-memory systems like SAP HANA and Spark accelerate analytical workloads by holding data in memory. In
+short, people are no longer willing to wait for non-in-memory systems.</li>
+<li><strong>Complex data and dynamic schemas</strong>: Real-world objects are easier to represent as hierarchical and nested data structures.
+This has lead to the rise of formats/technologies such as JSON and document databases. Analytical systems must treat
+this type of data as first class.</li>
+</ul>
+
+<p>There are many systems that support only one of the three requirements, and there are a few that support two of the
+three requirements. However, no existing system supports all three. The Big Data community has now come together to
+change this reality by creating the Apache Arrow project.</p>
+
+<p>Arrow combines the benefits of columnar data structures with in-memory computing. It provides the performance benefits
+of these modern techniques while also providing the flexibility of complex data and dynamic schemas. And it does all of
+this in an open source and standardized way.</p>
+
+<h3 id="arrow-is-a-combination-of-data-structures-algorithms-and-cross-language-bindings">Arrow is a combination of data structures, algorithms and cross-language bindings</h3>
+
+<p>Arrow consists of a number of connected technologies designed to be integrated into storage and execution engines. The
+key components of Arrow include:</p>
+
+<ol>
+<li>A set of defined data types, including both SQL and JSON types, such as Int, BigInt, Decimal, VarChar, Map, Struct and
+Array</li>
+<li>Canonical columnar in-memory representations of data to support an arbitrarily complex record structure built on top of
+the defined data types</li>
+<li>Common Arrow-aware companion data-structures including pick-lists, hash tables and queues</li>
+<li>IPC through shared memory, TCP/IP and RDMA</li>
+<li>Libraries for reading and writing columnar data in multiple languages including Java, C, C++ and Python</li>
+<li>Pipelined and SIMD algorithms for various operations including bitmap selection, hashing, filtering, bucketing, sorting
+and matching</li>
+<li>Columnar in-memory compression techniques to increase memory efficiency</li>
+<li>Tools for short-term persistence to non-volatile memory, SSD or HDD</li>
+</ol>
+
+<h3 id="arrow-is-not-a-storage-or-execution-engine">Arrow is not a storage or execution engine</h3>
+
+<p>Note that Arrow itself is not a storage or execution engine. It is designed to serve as a shared foundation for the
+following types of systems:</p>
+
+<ul>
+<li>SQL execution engines (such as Drill and Impala)</li>
+<li>Data analysis systems (such as Pandas and Spark)</li>
+<li>Streaming and queueing systems (such as Herron, Kafka and Storm)</li>
+<li>Storage systems (such as Parquet, Kudu, Cassandra and HBase)</li>
+</ul>
+
+<p>As such, Arrow doesn’t compete with any of these projects. Its core goal is to work within each of these projects to
+provide faster performance and better interoperability. In fact, Arrow is being built by the lead developers of these
+projects.</p>
+
+<h3 id="performance">Performance</h3>
+
+<p>The faster a user can get to the answer, the faster they can ask other questions. Performance begets more analysis, more
+use cases and further innovation. As CPUs become faster and more sophisticated, one of the key challenges is making sure
+processing technology leverages CPUs efficiently.</p>
+
+<p>Columnar in-memory analytics is first and foremost about ensuring optimal use of modern CPUs. Arrow is specifically
+designed to maximize cache locality, pipelining and SIMD instructions.</p>
+
+<p>Arrow memory buffers are compact representations of data designed for modern CPUs. The structures are defined linearly,
+matching typical read patterns. That means that data of similar type is collocated in memory. This makes cache
+prefetching more effective, minimizing CPU stalls resulting from cache misses and main memory accesses. These
+CPU-efficient data structures and access patterns extend to both traditional flat relational structures and modern
+complex data structures.</p>
+
+<p>From there, execution patterns are designed to take advantage of the superscalar and pipelined nature of modern
+processors. This is done by minimizing in-loop instruction count and loop complexity. These tight loops lead to better
+performance and less branch-prediction failures.</p>
+
+<p>Finally, the data structures themselves are designed for modern superword and SIMD instructions. Single Instruction
+Multiple Data (SIMD) instructions allow execution algorithms to operate more efficiently by executing multiple
+operations in a single clock cycle. In some cases, when using AVX instructions, these optimizations can increase
+performance by two orders of magnitude.</p>
+
+<p>Cache locality, pipelining and superword operations frequently provide 10-100x faster execution performance. Since many
+analytical workloads are CPU bound, these benefits translate into dramatic end-user performance gains. These gains
+result in faster answers and higher levels of user concurrency.</p>
+
+<p><br>
+<p style="text-align: center;">
+<img style="max-width: 65%;" src="/img/arrow1.png">
+</p></p>
+
+<h3 id="memory-efficiency">Memory efficiency</h3>
+
+<p>In-memory performance is great, but memory can be scarce. Arrow is designed to work even if the data doesn’t fit
+entirely in memory! The core data structure includes vectors of data and collections of these vectors (also called
+record batches). Record batches are typically 64KB-1MB, depending on the workload, and are always bounded at 2^16
+records. This not only improves cache locality, but also makes in-memory computing possible even in low-memory
+situations. Arrow uses micro-pointers to minimize memory overhead and retrieval costs where inter-data-structure
+pointers exist.</p>
+
+<p>With many Big Data clusters reaching 100s to 1000s of servers, systems must be able to take advantage of the aggregate
+memory of a cluster. Arrow is designed to minimize the cost of moving data on the network. It utilizes scatter/gather
+reads and writes and features a zero-serialization/deserialization design, allowing low-cost data movement between
+nodes. Arrow also works directly with RDMA-capable interconnects to provide a singular memory grid for larger in-memory
+workloads.</p>
+
+<h3 id="zero-overhead-data-sharing">Zero-overhead data sharing</h3>
+
+<p>Arrow helps both execution engines and storage systems. It increases the internal performance of execution engines, and
+also provides a canonical way to communicate analytical data efficiently across systems.</p>
+
+<p>Today there is no standard way for systems to transfer data. As a result, all communication involves serializing,
+copying an deserializing data. The serialization often takes place in the RPC layer, but there may also be implicit
+serialization imposed by the use of a shared set of record- and value-level APIs. In such cases, when working with
+multiple systems—such as Apache Drill reading from Apache Kudu—substantial resources and time are spent converting from
+one system’s internal representation to the other system’s internal representation.</p>
+
+<p>As Arrow is adopted as the internal representation in each system, systems have the same internal representation of
+data. This means that one system can hand data directly to the other system for consumption. And when these systems are
+collocated on the same node, the copy described above can also be avoided through the use of shared memory. This means
+that in many cases, moving data between two systems will have zero overhead.</p>
+
+<p><br>
+<p style="text-align: center;">
+<img style="max-width: 100%;" src="/img/arrow2.png">
+</p></p>
+
+<h3 id="first-class-support-for-popular-programming-languages">First-class support for popular programming languages</h3>
+
+<p>One of the key outcomes users will see, beyond performance and interoperability, is a level-playing field among
+different programming languages. Traditional data sharing is based on IPC and API-level integrations. While this is
+often simple, it results in poor performance if the user’s language is different from the underlying system’s language.
+Depending on the language and the set of algorithms implemented, the required transformation often represent the
+majority of the processing time consumed.</p>
+
+<p>This all changes with Arrow. By providing a canonical columnar in-memory representation of data, each programming
+language can interact directly with the raw data. C, C++, Java and Python Arrow libraries are underway and we will see
+integrations for R, Julia and JavaScript soon.</p>
+
+<h3 id="open-source-based-on-a-shared-and-acute-need">Open source based on a shared and acute need</h3>
+
+<p>Leading execution engines are continuously seeking opportunities to improve performance. Developers in the Drill, Impala
+and Spark communities have all separately recognized the need for a columnar in-memory approach to data.</p>
+
+<ul>
+<li>Drill developers have implemented a columnar in-memory analytics layer inside Drill known as ValueVectors. Drill
+provides an execution layer that performs SQL processing directly on columnar data without row materialization. The
+combination of optimizations for columnar storage and direct columnar execution significantly lowers memory footprints
+and provides faster execution of BI and SQL workloads.</li>
+<li>Impala developers also forecasted the need for a columnar in-memory approach in their 2015 CIDR paper:
+“We are also considering switching to a columnar canonical in-memory format for data that needs to be materialized
+during query processing, in order to take advantage of SIMD instructions”
+(<a href="http://www.cidrdb.org/cidr2015/Papers/CIDR15_Paper28.pdf">http://www.cidrdb.org/cidr2015/Papers/CIDR15_Paper28.pdf</a>)</li>
+<li>Spark developers also recognized this need, speaking of similar goals when outlining their vision for the Spark Tungsten
+initiative:
+“We’ve found that a large fraction of the CPU time is spent waiting for data to be fetched from main memory. As part of
+Project Tungsten, we are designing cache-friendly algorithms and data structures so Spark applications will spend less
+time waiting to fetch data from memory and more time doing useful work”
+(<a href="https://databricks.com/blog/2015/04/28/project-tungsten-bringing-spark-closer-to-bare-metal.html">https://databricks.com/blog/2015/04/28/project-tungsten-bringing-spark-closer-to-bare-metal.html</a>)</li>
+</ul>
+
+<p>The Big Data community has recognized an opportunity to develop a shared technology to address columnar in-memory
+analytics, and has joined forces to create Apache Arrow. The Apache Drill community is seeding the project with the Java
+library, based on Drill’s existing ValueVectors technology, and Wes McKinney, creator of Pandas and Ibis, is
+contributing the initial C/C++ library. Given the credentials of those involved as well as code provenance, the Apache
+Software Foundation decided to make Apache Arrow a Top-Level Project, highlighting the importance of the project and
+community behind it.</p>
+
+<h3 id="a-diverse-community-of-open-source-leaders">A diverse community of open source leaders</h3>
+
+<p>Many lead developers (PMC Chairs, PMC Members, Committers, etc.) of <strong>13</strong> major open source projects are involved in Apache
+Arrow:</p>
+
+<ul>
+<li>Calcite</li>
+<li>Cassandra</li>
+<li>Drill</li>
+<li>Hadoop</li>
+<li>HBase</li>
+<li>Ibis</li>
+<li>Impala</li>
+<li>Kudu</li>
+<li>Pandas</li>
+<li>Parquet</li>
+<li>Phoenix</li>
+<li>Spark</li>
+<li>Storm</li>
+</ul>
+
+<h3 id="what-s-next">What’s next?</h3>
+
+<p>The code for Apache Arrow is now available under the Apache 2.0 License for use in both open source and proprietary
+systems. Arrow implementations and bindings are available or underway for C, C++, Java and Python.</p>
+
+<p>Drill, Impala, Kudu, Ibis and Spark will become Arrow-enabled this year, and I anticipate that many other projects will
+embrace Arrow in the near future as well. Arrow community members (including myself) will be speaking at upcoming
+conferences including Strata San Jose, Strata London and numerous meetups.</p>
+
+<p>Join the community today. Follow @ApacheArrow, connect on the dev@arrow.apache.org list or check out the code at
+git://git.apache.org/arrow.git</p>
+
+        </div>
+      </div>
+
+      <div id="disqus_thread" class="container">
+        <script>
+          (function() { 
+          var d = document, s = d.createElement('script');
+          s.src = '//dremio.disqus.com/embed.js';
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+          })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      </div>
+
+      
+        	<footer id="footer" role="contentinfo">
+		<a href="#" class="gotop js-gotop"><i class="icon-arrow-up2"></i></a>
+		<div class="container">
+			<div class="">
+				<div class="col-md-12 text-center">
+					<p>Copyright &copy; dremio corporation. All Rights Reserved.</p>
+					
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-12 text-center">
+					<ul class="social social-circle">
+						<li><a href="#"><i class="icon-twitter"></i></a></li>
+						<li><a href="#"><i class="icon-facebook"></i></a></li>
+						<li><a href="#"><i class="icon-youtube"></i></a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+      
+
+
+    </body>
+</html>

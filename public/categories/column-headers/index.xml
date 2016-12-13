@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/column-headers/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/column-headers/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>SQL queries on CSV files with column headers</title>
+      <link>/kstirman.github.io/bookshelf/blog/SQL-queries-on-CSV-files-with-column-headers/</link>
+      <pubDate>Mon, 23 Nov 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/SQL-queries-on-CSV-files-with-column-headers/</guid>
+      <description>&lt;p&gt;A new feature of Drill 1.3.0 is the ability to query CSV files using the column names listed in the file&amp;rsquo;s header.&lt;/p&gt;
+
+&lt;p&gt;As an example, let&amp;rsquo;s look at &lt;a href=&#34;http://introcs.cs.princeton.edu/java/data/olympic-medals2012.csv&#34;&gt;this CSV formatted file&lt;/a&gt;
+of countries that participated in the 2012 Summer Olympics. Before we begin, rename the file so that it ends in &amp;lsquo;.csvh&amp;rsquo;
+instead of &amp;lsquo;.csv&amp;rsquo;. The extension change tells Drill to parse the header of the CSV file, which means we can use the
+in-file identifiers for column names when we construct our queries.&lt;/p&gt;
+
+&lt;p&gt;So now we can ask for the 10 countries with the most medals by entering:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT `Country.name` AS Country, CAST(Total AS INT) `Total Medals` FROM dfs.`/path/to/olympic-medals2012.csvh` ORDER BY `Total Medals` DESC LIMIT 10;
++--------------+---------------+
+|   Country    | Total Medals  |
++--------------+---------------+
+| US           | 104           |
+| China        | 88            |
+| Russia       | 82            |
+| UK           | 65            |
+| Germany      | 44            |
+| Japan        | 38            |
+| Australia    | 35            |
+| France       | 34            |
+| Italy        | 28            |
+| South Korea  | 28            |
++--------------+---------------+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;We can also enable header parsing for any extension (including regular .csv files) by using the Drill Web Console to
+edit the JSON of a storage plugin. You can open the console by running &amp;lsquo;drill-embedded&amp;rsquo; and going to
+&lt;a href=&#34;http://localhost:8047&#34;&gt;http://localhost:8047&lt;/a&gt; in a browser. Once you&amp;rsquo;ve loaded the page, go to &amp;ldquo;Storage&amp;rdquo; at the top and click &amp;ldquo;Update&amp;rdquo; next to
+(for example) the &amp;lsquo;dfs&amp;rsquo; plugin for the local file system. To enable header parsing for a file type we need to add the
+key-value pair &lt;code&gt;&amp;quot;extractHeader&amp;quot;: true&lt;/code&gt; to an entry in the &amp;ldquo;formats&amp;rdquo; section of the file. For instance, if we change the
+plugin so that tab separated (.tsv) files now have their headers read, then the section for that format would read:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;...
+    &amp;quot;tsv&amp;quot;: {
+      &amp;quot;type&amp;quot;: &amp;quot;text&amp;quot;.
+      &amp;quot;extensions&amp;quot;: [
+        &amp;quot;tsv&amp;quot;
+      ],
+      &amp;quot;extractHeader&amp;quot;: true,
+      &amp;quot;delimiter&amp;quot;: &amp;quot;\t&amp;quot;
+    },
+...
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Drill was &lt;em&gt;already&lt;/em&gt; an amazing tool for querying text files. But header parsing makes it even better!&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

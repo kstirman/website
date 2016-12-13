@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>dremio | reimagining data analytics for the modern world</title>
+    <link>kstirman.github.io/bookshelf/categories/math/index.xml</link>
+    <description>Recent content on dremio | reimagining data analytics for the modern world</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <atom:link href="kstirman.github.io/bookshelf/categories/math/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Predicting International Space Station solar transits using built-in SQL math functions</title>
+      <link>/kstirman.github.io/bookshelf/blog/predicting-international-space-station-solar-transits-using-built-in-SQL-math-functions/</link>
+      <pubDate>Mon, 21 Dec 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/kstirman.github.io/bookshelf/blog/predicting-international-space-station-solar-transits-using-built-in-SQL-math-functions/</guid>
+      <description>&lt;script type=&#34;text/javascript&#34;
+ src=&#34;http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML&#34;&gt;
+&lt;/script&gt;
+
+&lt;p&gt;If you&amp;rsquo;re an astronomy or spaceflight nerd (in my case: &amp;lsquo;check&amp;rsquo; and check&amp;rsquo;) there&amp;rsquo;s a good chance you&amp;rsquo;ve seen one of
+these really cool photos people have been taking lately where they capture an image of the International Space Station
+as it makes a transit through the disc of the Sun. Here&amp;rsquo;s one that was recently (September &amp;lsquo;15) featured on NASA&amp;rsquo;s
+popular &lt;a href=&#34;http://apod.nasa.gov/apod/astropix.html&#34;&gt;Astronomy Picture of the Day&lt;/a&gt; site:&lt;/p&gt;
+
+&lt;p&gt;&lt;br&gt;
+&lt;br&gt;
+&lt;p style=&#34;text-align: center;&#34;&gt;
+&lt;img style=&#34;max-width: 100%;&#34; src=&#34;kstirman.github.io/bookshelf/img/iss_sun_trans.jpg&#34;&gt;
+&lt;/p&gt;
+&lt;p style=&#34;text-align: center; font-style: italic;&#34;&gt;Two solar transits of the ISS. Image by &lt;a href=&#34;https://www.flickr.com/photos/astrohardy/&#34;&gt;Hartwig Luethen&lt;/a&gt;
+via &lt;a href=&#34;http://apod.nasa.gov/apod/ap150912.html&#34;&gt;APOD&lt;/a&gt;.&lt;/p&gt;
+&lt;br&gt;
+&lt;br&gt;&lt;/p&gt;
+
+&lt;p&gt;For today&amp;rsquo;s demo, I&amp;rsquo;d like to show how we can use the geographic location where these photos were taken, along with some
+NASA data and Apache Drill, to predict the times at which these ISS transits were captured.&lt;/p&gt;
+
+&lt;p&gt;To begin with we&amp;rsquo;ll need the ephemerides for the ISS and the Sun. The &amp;lsquo;ephemeris&amp;rsquo; (singular of ephemerides) is basically
+a timetable that gives astronomical data about an object. (NASA has a great &lt;a href=&#34;http://ssd.jpl.nasa.gov/horizons.cgi&#34;&gt;web-based
+tool&lt;/a&gt; for grabbing this information). In our case we&amp;rsquo;ll want the ground-based
+azimuth and elevation angles for a location in Schmalenbeck, Germany (where the photos were taken). Also be sure to
+indicate that you want them exported in &amp;lsquo;csv&amp;rsquo; format at the maximum 1-minute resolution, and for the whole month of
+August 2015 (when the photo was taken).&lt;/p&gt;
+
+&lt;p&gt;Once the files are downloaded we have to clean them up slightly before we feed them into Drill. First we&amp;rsquo;ll change the
+way new lines are indicated in the files with these unix commands:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;$ tr &#39;\r&#39; &#39;\n&#39; &amp;lt; iss_horizons_results.txt &amp;gt; iss_ephemeris.csv
+$ tr &#39;\r&#39; &#39;\n&#39; &amp;lt; sun_horizons_results.txt &amp;gt; sun_ephemeris.csv
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Then we&amp;rsquo;ll need to open the them up in a text editor in order to delete some non-tabulated text information at the
+beginning and end of the files. But that&amp;rsquo;s it in terms of data preparation!&lt;/p&gt;
+
+&lt;p&gt;Of course the elephant in the room at this point is that I can&amp;rsquo;t attempt this calculation without at least briefly
+turning my attention to some Slightly Scary Vector Math. I&amp;rsquo;ll spare you the grisly details, but it turns out that the
+equation you want for the angular separation between two objects is:&lt;/p&gt;
+
+&lt;p&gt;$$ \psi = \cos^{-1}( \cos \phi_1  \cos \theta_1 \cos \phi_2  \cos \theta_2 + \sin \phi_1 \cos \theta_1 \sin \phi_2 \cos
+\theta_2 + \sin \theta_1 \sin \theta_2) $$&lt;/p&gt;
+
+&lt;p&gt;where \((\phi_1,\theta_1\)) are the azimuth and elevation angles for the first object (say, the ISS), and
+\((\phi_2,\theta_2\)) are the same angles for the second one (the Sun).&lt;/p&gt;
+
+&lt;p&gt;To proceed with this analysis, we&amp;rsquo;re going to push the ephemeris information through a series of views, which can be
+thought of as &amp;lsquo;shortcuts&amp;rsquo; to data structures. After running &lt;code&gt;USE dfs.tmp;&lt;/code&gt; to switch to a temporary writable workspace,
+we&amp;rsquo;ll begin by creating the following &lt;code&gt;iss_rad&lt;/code&gt; and &lt;code&gt;sun_raw&lt;/code&gt; views to hold timestamps and angles (in radians!):&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW iss_rad AS
+     SELECT LTRIM(columns[0],&#39; &#39;) utc_date, RADIANS(CAST(columns[3] AS FLOAT)) azi, RADIANS(CAST(columns[4] AS FLOAT)) ele
+       FROM dfs.`/path/to/iss_ephemeris.csv`;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW sun_rad AS
+     SELECT LTRIM(columns[0],&#39; &#39;) utc_date, RADIANS(CAST(columns[3] AS FLOAT)) azi, RADIANS(CAST(columns[4] AS FLOAT)) ele
+      FROM  dfs.`/path/to/sun_ephemeris.csv`;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Next we&amp;rsquo;ll make &lt;code&gt;angle&lt;/code&gt;, which is a &lt;code&gt;JOIN&lt;/code&gt; between these two views. This will hold all the angular data in one place:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW angles AS
+     SELECT iss_rad.utc_date, iss_rad.azi azi_iss, iss_rad.ele ele_iss, sun_rad.azi azi_sun, sun_rad.ele ele_sun
+       FROM iss_rad
+       JOIN sun_rad
+         ON iss_rad.utc_date=sun_rad.utc_date;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now it&amp;rsquo;s time to process all of these angles through the built-in &lt;code&gt;SIN&lt;/code&gt; and &lt;code&gt;COS&lt;/code&gt; functions as we compose the &lt;code&gt;trig&lt;/code&gt; view:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW trig AS
+     SELECT utc_date, COS(azi_iss) cai, SIN(azi_iss) sai, COS(ele_iss) cei, SIN(ele_iss) sei, COS(azi_sun) cas, SIN(azi_sun) sas, COS(ele_sun) ces, SIN(ele_sun) ses
+       FROM angles;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Finally we&amp;rsquo;re ready to apply the angular separation equation, and create a view to hold that value (in degrees) for each
+timestamp in our data set:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;CREATE VIEW angular_separation AS
+     SELECT utc_date, DEGREES(ACOS(cai*cei*cas*ces + sai*cei*sas*ces + sei*ses)) separation
+       FROM trig;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;At this point all that&amp;rsquo;s left to do is sort by this separation and see what comes back. For the month of August 2015 in
+Schmalenbeck, Germany, we get the following smallest separation angles between the ISS and the Sun:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;gt; SELECT utc_date, separation FROM angular_separation ORDER BY separation LIMIT 15;
++--------------------+---------------------+
+|      utc_date      |     separation      |
++--------------------+---------------------+
+| 2015-Aug-22 14:16  | 0.5936624801482439  |
+| 2015-Aug-21 15:09  | 1.2274954880124447  |
+| 2015-Aug-24 15:41  | 3.667367759874681   |
+| 2015-Aug-20 16:02  | 4.103746138764579   |
+| 2015-Aug-21 16:44  | 4.437939855015551   |
+| 2015-Aug-19 16:54  | 4.970480616196848   |
+| 2015-Aug-27 11:26  | 5.584842825521101   |
+| 2015-Aug-30 10:22  | 5.8633162688672025  |
+| 2015-Aug-23 13:23  | 7.210373878208339   |
+| 2015-Aug-23 16:33  | 7.526240691540221   |
+| 2015-Aug-30 22:46  | 7.530002688976559   |
+| 2015-Aug-20 17:35  | 7.531388238891503   |
+| 2015-Aug-22 17:25  | 7.56500067197781    |
+| 2015-Aug-20 17:36  | 7.820341221305291   |
+| 2015-Aug-22 15:51  | 7.863051641188923   |
++--------------------+---------------------+
+15 rows selected (0.419 seconds)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;According to APOD, the images in the photograph were captured on August 22. And if you check out this &lt;a href=&#34;https://www.flickr.com/photos/astrohardy/20224921153/&#34;&gt;supplementary
+image&lt;/a&gt; on the photographer&amp;rsquo;s Flickr account, you can see that he
+indicates the transits as occurring at 14:15:58 and 15:51:31 UTC. Both of these times show up in the results of my
+query!&lt;/p&gt;
+
+&lt;p&gt;The only drawback to this method is that the ephemeris data should have a higher time resolution. As the APOD text
+points out, the ISS has an angular velocity of about half a degree a second for these transits, which means that the
+&amp;lsquo;minimum&amp;rsquo; angle for a close pass may be misleadingly large, as in the case of the second transit of August 22.&lt;/p&gt;
+
+&lt;p&gt;But in any case, Drill worked splendidly in this application! And I&amp;rsquo;m happy to report that my math did, too :)&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>
